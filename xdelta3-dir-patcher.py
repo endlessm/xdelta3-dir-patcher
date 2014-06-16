@@ -69,18 +69,38 @@ class XDelta3DirPatcher(object):
 
         self.copy_attributes(new_path, target_path)
 
-    def run(self):
-        print("Running delta3...")
+    def diff(self, old_dir, new_dir, target_dir):
+        delta_target_dir = path.join(target_dir, 'xdelta')
 
-        target_dir = path.join(args.target_dir, 'xdelta')
-
-        for root, dirs, new_files in walk(args.new_dir):
-            rel_path = path.relpath(root, args.new_dir).split(sep)[0]
+        for root, dirs, new_files in walk(new_dir):
+            rel_path = path.relpath(root, new_dir).split(sep)[0]
 
             print('-'*10, root, '-'*10)
             print(new_files)
             for new_file in new_files:
-                self._find_file_delta(rel_path, new_file, args.old_dir, args.new_dir, target_dir)
+                self._find_file_delta(rel_path, new_file, old_dir, new_dir, delta_target_dir)
+
+    def apply(self, old_dir, patch_dir, target_dir):
+        delta_patch_dir = path.join(patch_dir, 'xdelta')
+
+        for root, dirs, patch_files in walk(delta_patch_dir):
+            rel_path = path.relpath(root, delta_patch_dir).split(sep)[0]
+
+            print('-'*10, rel_path, '-'*10)
+            print(patch_files)
+            for patch_file in patch_files:
+                print(patch_file)
+                # TODO self._apply_file_delta(rel_path, filename, old_dir, delta_patch_dir, new_dir)
+
+    def run(self):
+        print("Running delta3...")
+
+        if args.action == 'diff':
+            print("Generating delta pack")
+            self.diff(args.old_dir, args.new_dir, args.target_dir)
+        else:
+            print("Applying delta pack")
+            self.apply(args.old_dir, args.patch_dir, args.target_dir)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Creates and applies XDelta3-based directory diff tgz files')
@@ -93,6 +113,9 @@ if __name__ == '__main__':
             help='Generate a diff from a directory. See "apply -help" for more options')
 
     # Arguments to apply a diff
+    parser_apply.add_argument('old_dir',
+            help='Folder containing the old version of the files')
+
     parser_apply.add_argument('patch_dir',
             help='Folder containing the old version of the files')
 
