@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 import argparse
-from os import chmod, makedirs, path, sep, stat, walk
+from os import chmod, chown, makedirs, path, sep, stat, walk
+from shutil import copymode, copystat
 from subprocess import call
 from stat import *
 
@@ -38,7 +39,7 @@ class XDelta3DirPatcher(object):
 
         if not path.isfile(old_path):
             old_path = None
-            print("Old file not present. Ignoring source in XDelta")
+            if args.debug: print("Old file not present. Ignoring source in XDelta")
 
         command = ['xdelta3', '-f', '-e']
         if old_path:
@@ -48,15 +49,20 @@ class XDelta3DirPatcher(object):
         command.append(new_path)
         command.append(target_path)
 
-        print("Generating xdelta: %s" % command)
+        if args.debug: print("Generating xdelta: %s" % command)
         call(command)
 
-        print("Copying mode data")
-        new_mode = S_IMODE(stat(new_path).st_mode)
-        chmod(target_path, new_mode)
+        if args.debug: print("Copying mode data")
+        copymode(new_path, target_path)
 
-        if args.debug:
-            print("Mode: %s" % new_mode)
+        if args.debug: print("Copying metadata")
+        copystat(new_path, target_path)
+
+        if args.debug: print("Copying UID & GID")
+        uid = stat(new_path).st_uid
+        gid = stat(new_path).st_gid
+
+        chown(target_path,uid,gid)
 
     def run(self):
         print("Running delta3...")
