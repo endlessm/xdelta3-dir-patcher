@@ -72,34 +72,55 @@ class XDelta3DirPatcher(object):
     def run(self):
         print("Running delta3...")
 
+        target_dir = path.join(args.target_dir, 'xdelta')
+
         for root, dirs, new_files in walk(args.new_dir):
             rel_path = path.relpath(root, args.new_dir).split(sep)[0]
 
             print('-'*10, root, '-'*10)
             print(new_files)
             for new_file in new_files:
-                self._find_file_delta(rel_path, new_file, args.old_dir, args.new_dir, args.target_dir)
+                self._find_file_delta(rel_path, new_file, args.old_dir, args.new_dir, target_dir)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Creates and applies XDelta3-based directory diff tgz files')
 
-    parser.add_argument('old_dir', \
+    subparsers = parser.add_subparsers(dest='action')
+    parser_apply = subparsers.add_parser('apply',
+            help='Apply a diff from a directory. See "apply -help" for more options')
+
+    parser_diff = subparsers.add_parser('diff',
+            help='Generate a diff from a directory. See "apply -help" for more options')
+
+    # Arguments to apply a diff
+    parser_apply.add_argument('patch_dir',
             help='Folder containing the old version of the files')
 
-    parser.add_argument('new_dir', \
+    parser_apply.add_argument('target_dir',
+            help='Folder containing the old version of the files')
+
+    # Arguments to create a diff
+    parser_diff.add_argument('old_dir',
+            help='Folder containing the old version of the files')
+
+    parser_diff.add_argument('new_dir',
             help='Folder containing the new version of the files')
 
-    parser.add_argument('target_dir', \
+    parser_diff.add_argument('target_dir',
             help='Destination folder for the generated diff')
 
-    parser.add_argument('--debug', \
-            help='Enable debugging output', \
+    # Generic arguments
+    parser.add_argument('--debug',
+            help='Enable debugging output',
             action='store_true')
 
-    parser.add_argument('--version', \
-            action='version', \
+    parser.add_argument('--version',
+            action='version',
             version='%(prog)s v' + VERSION)
 
     args = AttributeDict(vars(parser.parse_args()))
 
-    XDelta3DirPatcher(args).run()
+    if args.action:
+        XDelta3DirPatcher(args).run()
+    else:
+        parser.print_help()
