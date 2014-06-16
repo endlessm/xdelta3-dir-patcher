@@ -6,7 +6,6 @@ from shutil import copymode, copystat
 from subprocess import call
 from stat import *
 
-
 VERSION='0.1'
 
 # Allows for invoking attributes as methods/functions
@@ -16,17 +15,43 @@ class AttributeDict(dict):
     def __setattr__(self, attr, value):
         self[attr] = value
 
+class XDeltaImpl(object):
+    @staticmethod
+    def diff(old_file, new_file, target_file):
+        command = ['xdelta3', '-f', '-e']
+        if old_file:
+            command.append('-s')
+            command.append(old_file)
+
+        command.append(new_file)
+        command.append(target_file)
+
+        if args.debug: print("Generating xdelta: %s" % command)
+        call(command)
+
 class XDelta3DirPatcher(object):
     def __init__(self, args):
         print("Initializing patcher")
 
         self.args = args
 
+    def copy_attributes(self, src_file, dest_file):
+        if args.debug: print("Copying mode data")
+        copymode(src_file, dest_file)
+
+        if args.debug: print("Copying stat data (sans UID/GID")
+        copystat(src_file, dest_file)
+
+        if args.debug: print("Copying UID & GID")
+        uid = stat(src_file).st_uid
+        gid = stat(src_file).st_gid
+
+        chown(dest_file,uid,gid)
+
     def _find_file_delta(self, rel_path, new_file, old_root, new_root, target_root):
         print("\nProcessing %s" % new_file)
 
         target_path = path.join(target_root, rel_path)
-
         if not path.exists(target_path):
             makedirs(target_path)
 
@@ -34,35 +59,15 @@ class XDelta3DirPatcher(object):
         new_path = path.join(new_root, rel_path, new_file)
         target_path = path.join(target_path, new_file)
 
-        if args.debug:
-            print([old_path, new_path, target_path])
+        if args.debug: print([old_path, new_path, target_path])
 
         if not path.isfile(old_path):
             old_path = None
             if args.debug: print("Old file not present. Ignoring source in XDelta")
 
-        command = ['xdelta3', '-f', '-e']
-        if old_path:
-            command.append('-s')
-            command.append(old_path)
+        XDeltaImpl.diff(old_path, new_path, target_path)
 
-        command.append(new_path)
-        command.append(target_path)
-
-        if args.debug: print("Generating xdelta: %s" % command)
-        call(command)
-
-        if args.debug: print("Copying mode data")
-        copymode(new_path, target_path)
-
-        if args.debug: print("Copying metadata")
-        copystat(new_path, target_path)
-
-        if args.debug: print("Copying UID & GID")
-        uid = stat(new_path).st_uid
-        gid = stat(new_path).st_gid
-
-        chown(target_path,uid,gid)
+        self.copy_attributes(new_path, target_path)
 
     def run(self):
         print("Running delta3...")
