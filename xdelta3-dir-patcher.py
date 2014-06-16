@@ -110,17 +110,17 @@ if __name__ == '__main__':
             help='Apply a diff from a directory. See "apply -help" for more options')
 
     parser_diff = subparsers.add_parser('diff',
-            help='Generate a diff from a directory. See "apply -help" for more options')
+            help='Generate a diff from a directory. See "diff -help" for more options')
 
     # Arguments to apply a diff
     parser_apply.add_argument('old_dir',
             help='Folder containing the old version of the files')
 
     parser_apply.add_argument('patch_dir',
-            help='Folder containing the old version of the files')
+            help='Folder containing the patches')
 
     parser_apply.add_argument('target_dir',
-            help='Folder containing the old version of the files')
+            help='Destination folder for the new versions of files')
 
     # Arguments to create a diff
     parser_diff.add_argument('old_dir',
