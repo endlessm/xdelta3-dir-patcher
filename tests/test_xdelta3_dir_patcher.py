@@ -1,7 +1,9 @@
 import unittest
 from mock import Mock
+from shutil import rmtree
 from subprocess import CalledProcessError, check_output, STDOUT
-from os import remove
+from tempfile import mkdtemp
+from os import path, remove
 
 # Dashes are standard for exec scipts but not allowed for modules in Python. We
 # use the script standard since we will be running that file as a script most
@@ -10,6 +12,12 @@ patcher = __import__("xdelta3-dir-patcher")
 
 class TestXDelta3DirPatcher(unittest.TestCase):
     EXECUTABLE="xdelta3-dir-patcher.py"
+
+    def setUp(self):
+        self.temp_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
+
+    def tearDown(self):
+        rmtree(self.temp_dir)
 
     # Integration tests
     def test_version_is_correct(self):
@@ -47,7 +55,9 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         else: self.fail()
 
     def test_apply_usage_is_not_printed_if_args_are_correct(self):
-        output = check_output(["./%s" % self.EXECUTABLE, "apply", "foo", "bar", "baz"] )
+        old_path = path.join('tests', 'test_files', 'old_version1')
+        delta_path = path.join('tests', 'test_files', 'patch1.xdelta.tgz')
+        output = check_output(["./%s" % self.EXECUTABLE, "apply", old_path, delta_path, self.temp_dir, "--ignore-euid"] )
         self.assertNotIn("usage: ", output)
 
     def test_diff_usage_is_printed_if_not_enough_args(self):
@@ -68,9 +78,11 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         else: self.fail()
 
     def test_diff_usage_is_not_printed_if_args_are_correct(self):
-        output = check_output(["./%s" % self.EXECUTABLE, "diff", "foo", "bar", "baz"] )
+        old_path = path.join('tests', 'test_files', 'old_version1')
+        new_path = path.join('tests', 'test_files', 'new_version1')
+        delta_path = path.join(self.temp_dir, 'foo.tgz')
+        output = check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_path, delta_path] )
         self.assertNotIn("usage: ", output)
-        remove("baz")
 
     def test_other_actions_are_not_allowed(self):
         try:
@@ -101,6 +113,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         args.action = 'apply'
         args.old_dir = 'old'
         args.patch_bundle = 'patch'
+        args.ignore_euid = True
         args.target_dir = 'target'
 
         test_object = patcher.XDelta3DirPatcher(args)
