@@ -122,3 +122,22 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         test_object.run()
 
         test_object.apply.assert_called_once_with('old', 'patch', 'target')
+
+    def test_check_euid_does_not_break_if_ignoring_euid(self):
+        # Implicit: Does not throw error
+        patcher.XDelta3DirPatcher.check_euid(True)
+
+    def test_check_euid_does_not_break_if_not_ignoring_euid_and_euid_is_0(self):
+        mock_method = Mock(return_value = 0)
+        # Implicit: Does not throw error
+        patcher.XDelta3DirPatcher.check_euid(False, mock_method)
+
+    def test_check_euid_breaks_if_not_ignoring_euid_and_euid_is_not_0(self):
+        mock_method = Mock(return_value = 123)
+        try:
+            patcher.XDelta3DirPatcher.check_euid(False, mock_method)
+        except:
+            # Expected exception
+            pass
+        else:
+            fail("Should have thrown exception")

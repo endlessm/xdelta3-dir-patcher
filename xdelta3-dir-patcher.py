@@ -168,12 +168,11 @@ class XDelta3DirPatcher(object):
 
         print("Done")
 
-    # TODO Test me
     @staticmethod
     def check_euid(ignore_euid, get_euid_method = geteuid):
         if (not ignore_euid) and get_euid_method() != 0:
             stderr.write("ERROR: You must be root to apply the delta! Exiting.\n")
-            exit(1)
+            raise Exception()
 
     def run(self):
         print("Running directory patcher...")
