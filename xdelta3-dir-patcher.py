@@ -16,6 +16,7 @@ class AttributeDict(dict):
         self[attr] = value
 
 class XDeltaImpl(object):
+    # TODO: Test me
     @staticmethod
     def diff(old_file, new_file, target_file):
         command = ['xdelta3', '-f', '-e']
@@ -29,6 +30,8 @@ class XDeltaImpl(object):
         if args.debug: print("Generating xdelta: %s" % command)
         call(command)
 
+    # TODO: Test me
+    @staticmethod
     def apply(old_file, patch_file, target_file):
         command = ['xdelta3', '-f', '-d']
         if old_file:
@@ -48,6 +51,7 @@ class XDelta3DirPatcher(object):
         self.args = args
         self.delta_impl = delta_impl
 
+    # TODO: Test me
     def copy_attributes(self, src_file, dest_file):
         if args.debug: print("Copying mode data")
         copymode(src_file, dest_file)
@@ -99,6 +103,7 @@ class XDelta3DirPatcher(object):
 
         self.copy_attributes(patch_path, target_path)
 
+    # TODO: Test me
     def diff(self, old_dir, new_dir, target_dir):
         delta_target_dir = path.join(target_dir, 'xdelta')
 
@@ -110,6 +115,7 @@ class XDelta3DirPatcher(object):
             for new_file in new_files:
                 self._find_file_delta(rel_path, new_file, old_dir, new_dir, delta_target_dir)
 
+    # TODO: Test me
     def apply(self, old_dir, patch_dir, target_dir):
         delta_patch_dir = path.join(patch_dir, 'xdelta')
 
@@ -121,6 +127,7 @@ class XDelta3DirPatcher(object):
             for patch_file in patch_files:
                 self._apply_file_delta(rel_path, patch_file, old_dir, delta_patch_dir, target_dir)
 
+    # TODO: Test me
     def run(self):
         print("Running delta3...")
 
