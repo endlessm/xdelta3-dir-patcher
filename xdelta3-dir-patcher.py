@@ -42,10 +42,11 @@ class XDeltaImpl(object):
         call(command)
 
 class XDelta3DirPatcher(object):
-    def __init__(self, args):
+    def __init__(self, args, delta_impl = XDeltaImpl):
         print("Initializing patcher")
 
         self.args = args
+        self.delta_impl = delta_impl
 
     def copy_attributes(self, src_file, dest_file):
         if args.debug: print("Copying mode data")
@@ -77,7 +78,7 @@ class XDelta3DirPatcher(object):
             old_path = None
             if args.debug: print("Old file not present. Ignoring source in XDelta")
 
-        XDeltaImpl.diff(old_path, new_path, target_path)
+        self.delta_impl.diff(old_path, new_path, target_path)
 
         self.copy_attributes(new_path, target_path)
 
@@ -94,7 +95,7 @@ class XDelta3DirPatcher(object):
 
         if args.debug: print([old_path, patch_path, target_path])
 
-        XDeltaImpl.apply(old_path, patch_path, target_path)
+        self.delta_impl.apply(old_path, patch_path, target_path)
 
         self.copy_attributes(patch_path, target_path)
 

@@ -69,7 +69,6 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         output = check_output(["./%s" % self.EXECUTABLE, "diff", "foo", "bar", "baz"] )
         self.assertNotIn("usage: ", output)
 
-
     def test_other_actions_are_not_allowed(self):
         try:
             check_output(["./%s" % self.EXECUTABLE, "foobar"],
