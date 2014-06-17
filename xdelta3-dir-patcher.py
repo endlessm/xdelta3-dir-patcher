@@ -29,6 +29,18 @@ class XDeltaImpl(object):
         if args.debug: print("Generating xdelta: %s" % command)
         call(command)
 
+    def apply(old_file, patch_file, target_file):
+        command = ['xdelta3', '-f', '-d']
+        if old_file:
+            command.append('-s')
+            command.append(old_file)
+
+        command.append(patch_file)
+        command.append(target_file)
+
+        if args.debug: print("Applying xdelta: %s" % command)
+        call(command)
+
 class XDelta3DirPatcher(object):
     def __init__(self, args):
         print("Initializing patcher")
@@ -69,6 +81,23 @@ class XDelta3DirPatcher(object):
 
         self.copy_attributes(new_path, target_path)
 
+    def _apply_file_delta(self, rel_path, patch_file, old_root, patch_root, target_root):
+        print("\nProcessing %s" % patch_file)
+
+        target_path = path.join(target_root, rel_path)
+        if not path.exists(target_path):
+            makedirs(target_path)
+
+        old_path = path.join(old_root, rel_path, patch_file)
+        patch_path = path.join(patch_root, rel_path, patch_file)
+        target_path = path.join(target_path, patch_file)
+
+        if args.debug: print([old_path, patch_path, target_path])
+
+        XDeltaImpl.apply(old_path, patch_path, target_path)
+
+        self.copy_attributes(patch_path, target_path)
+
     def diff(self, old_dir, new_dir, target_dir):
         delta_target_dir = path.join(target_dir, 'xdelta')
 
@@ -84,13 +113,12 @@ class XDelta3DirPatcher(object):
         delta_patch_dir = path.join(patch_dir, 'xdelta')
 
         for root, dirs, patch_files in walk(delta_patch_dir):
-            rel_path = path.relpath(root, delta_patch_dir).split(sep)[0]
+            rel_path = path.relpath(root, delta_patch_dir)
 
             print('-'*10, rel_path, '-'*10)
             print(patch_files)
             for patch_file in patch_files:
-                print(patch_file)
-                # TODO self._apply_file_delta(rel_path, filename, old_dir, delta_patch_dir, new_dir)
+                self._apply_file_delta(rel_path, patch_file, old_dir, delta_patch_dir, target_dir)
 
     def run(self):
         print("Running delta3...")
