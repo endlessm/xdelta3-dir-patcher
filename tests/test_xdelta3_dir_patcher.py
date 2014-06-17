@@ -141,3 +141,53 @@ class TestXDelta3DirPatcher(unittest.TestCase):
             pass
         else:
             fail("Should have thrown exception")
+
+    # ------------------- XDeltaImpl tests
+    def test_xdelta_impl_run_command_invokes_the_command(self):
+        # TODO: implement the test
+        pass
+
+    def test_xdelta_impl_diff_uses_correct_system_arguments(self):
+        test_class = patcher.XDelta3Impl
+        original_run_command = test_class.run_command
+        test_class.run_command = Mock()
+
+        test_class.diff("old", "new", "target")
+
+        test_class.run_command.assert_called_once_with(['xdelta3', '-f', '-e', '-s', 'old', 'new', 'target'])
+
+        test_class.run_command = original_run_command
+
+    def test_xdelta_impl_diff_uses_correct_system_arguments_when_old_file_is_not_there(self):
+        test_class = patcher.XDelta3Impl
+        original_run_command = test_class.run_command
+        test_class.run_command = Mock()
+
+        test_class.diff(None, "new", "target")
+
+        test_class.run_command.assert_called_once_with(['xdelta3', '-f', '-e', 'new', 'target'])
+
+        test_class.run_command = original_run_command
+
+    def test_xdelta_impl_apply_uses_correct_system_arguments(self):
+        test_class = patcher.XDelta3Impl
+        original_run_command = test_class.run_command
+        test_class.run_command = Mock()
+
+        test_class.apply("old", "patch", "target")
+
+        test_class.run_command.assert_called_once_with(['xdelta3', '-f', '-d', '-s', 'old', 'patch', 'target'])
+
+        test_class.run_command = original_run_command
+
+    def test_xdelta_impl_apply_uses_correct_system_arguments_when_old_file_is_not_there(self):
+        test_class = patcher.XDelta3Impl
+        original_run_command = test_class.run_command
+        test_class.run_command = Mock()
+
+        test_class.apply(None, "patch", "target")
+
+        test_class.run_command.assert_called_once_with(['xdelta3', '-f', '-d', 'patch', 'target'])
+
+        test_class.run_command = original_run_command
+

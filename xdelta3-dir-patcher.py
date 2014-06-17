@@ -19,15 +19,15 @@ class AttributeDict(dict):
     def __setattr__(self, attr, value):
         self[attr] = value
 
-class XDeltaImpl(object):
+class XDelta3Impl(object):
     # TODO: Test me
     @staticmethod
-    def run_command(args):
-        check_output(args, stderr=STDOUT)
+    def run_command(args, exec_method = check_output):
+        exec_method(args, stderr=STDOUT)
 
     # TODO: Test me
     @staticmethod
-    def diff(old_file, new_file, target_file):
+    def diff(old_file, new_file, target_file, debug = False):
         command = ['xdelta3', '-f', '-e']
         if old_file:
             command.append('-s')
@@ -36,12 +36,12 @@ class XDeltaImpl(object):
         command.append(new_file)
         command.append(target_file)
 
-        if args.debug: print("Generating xdelta: %s" % command)
-        XDeltaImpl.run_command(command)
+        if debug: print("Generating xdelta: %s" % command)
+        XDelta3Impl.run_command(command)
 
     # TODO: Test me
     @staticmethod
-    def apply(old_file, patch_file, target_file):
+    def apply(old_file, patch_file, target_file, debug = False):
         command = ['xdelta3', '-f', '-d']
         if old_file:
             command.append('-s')
@@ -50,13 +50,13 @@ class XDeltaImpl(object):
         command.append(patch_file)
         command.append(target_file)
 
-        if args.debug: print("Applying xdelta: %s" % command)
-        XDeltaImpl.run_command(command)
+        if debug: print("Applying xdelta: %s" % command)
+        XDelta3Impl.run_command(command)
 
 class XDelta3DirPatcher(object):
     PATCH_FOLDER = 'xdelta'
 
-    def __init__(self, args, delta_impl = XDeltaImpl):
+    def __init__(self, args, delta_impl = XDelta3Impl):
         self.args = args
         self.delta_impl = delta_impl
 
@@ -91,7 +91,7 @@ class XDelta3DirPatcher(object):
             old_path = None
             if args.debug: print("Old file not present. Ignoring source in XDelta")
 
-        self.delta_impl.diff(old_path, new_path, target_path)
+        self.delta_impl.diff(old_path, new_path, target_path, self.args.debug)
 
         self.copy_attributes(new_path, target_path)
 
@@ -112,7 +112,7 @@ class XDelta3DirPatcher(object):
             old_path = None
             if args.debug: print("Old file not present. Ignoring source in XDelta")
 
-        self.delta_impl.apply(old_path, patch_path, target_path)
+        self.delta_impl.apply(old_path, patch_path, target_path, self.args.debug)
 
         self.copy_attributes(patch_path, target_path)
 
