@@ -1,10 +1,11 @@
 import unittest
+from mock import Mock
 from subprocess import CalledProcessError, check_output, STDOUT
 
 # Dashes are standard for exec scipts but not allowed for modules in Python. We
 # use the script standard since we will be running that file as a script most
 # often.
-__import__("xdelta3-dir-patcher")
+patcher = __import__("xdelta3-dir-patcher")
 
 class TestXDelta3DirPatcher(unittest.TestCase):
     EXECUTABLE="xdelta3-dir-patcher.py"
@@ -79,5 +80,30 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         else: self.fail()
 
     # Unit tests
-    def test_foo(self):
-        pass
+    def test_run_calls_diff_with_correct_arguments_if_action_is_diff(self):
+        args = patcher.AttributeDict()
+        args.action = 'diff'
+        args.old_dir = 'old'
+        args.new_dir = 'new'
+        args.target_dir = 'target'
+
+        test_object = patcher.XDelta3DirPatcher(args)
+        test_object.diff = Mock()
+
+        test_object.run()
+
+        test_object.diff.assert_called_once_with('old', 'new', 'target')
+
+    def test_run_calls_apply_with_correct_arguments_if_action_is_apply(self):
+        args = patcher.AttributeDict()
+        args.action = 'apply'
+        args.old_dir = 'old'
+        args.patch_dir = 'patch'
+        args.target_dir = 'target'
+
+        test_object = patcher.XDelta3DirPatcher(args)
+        test_object.apply = Mock()
+
+        test_object.run()
+
+        test_object.apply.assert_called_once_with('old', 'patch', 'target')

@@ -127,16 +127,15 @@ class XDelta3DirPatcher(object):
             for patch_file in patch_files:
                 self._apply_file_delta(rel_path, patch_file, old_dir, delta_patch_dir, target_dir)
 
-    # TODO: Test me
     def run(self):
         print("Running delta3...")
 
-        if args.action == 'diff':
+        if self.args.action == 'diff':
             print("Generating delta pack")
-            self.diff(args.old_dir, args.new_dir, args.target_dir)
+            self.diff(self.args.old_dir, self.args.new_dir, self.args.target_dir)
         else:
             print("Applying delta pack")
-            self.apply(args.old_dir, args.patch_dir, args.target_dir)
+            self.apply(self.args.old_dir, self.args.patch_dir, self.args.target_dir)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Creates and applies XDelta3-based directory diff tgz files')
