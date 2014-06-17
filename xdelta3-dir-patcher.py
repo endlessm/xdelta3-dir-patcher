@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 
 import argparse
-from os import chmod, chown, makedirs, path, sep, stat, walk
-from shutil import copymode, copystat
-from subprocess import call
+import tarfile
+
+from os import chmod, chown, makedirs, mkdir, path, sep, stat, walk
+from shutil import copymode, copystat, rmtree
+from subprocess import check_output, STDOUT
 from stat import *
+from tempfile import mkdtemp
 
 VERSION='0.1'
 
@@ -18,6 +21,11 @@ class AttributeDict(dict):
 class XDeltaImpl(object):
     # TODO: Test me
     @staticmethod
+    def run_command(args):
+        check_output(args, stderr=STDOUT)
+
+    # TODO: Test me
+    @staticmethod
     def diff(old_file, new_file, target_file):
         command = ['xdelta3', '-f', '-e']
         if old_file:
@@ -28,7 +36,7 @@ class XDeltaImpl(object):
         command.append(target_file)
 
         if args.debug: print("Generating xdelta: %s" % command)
-        call(command)
+        XDeltaImpl.run_command(command)
 
     # TODO: Test me
     @staticmethod
@@ -42,7 +50,7 @@ class XDeltaImpl(object):
         command.append(target_file)
 
         if args.debug: print("Applying xdelta: %s" % command)
-        call(command)
+        XDeltaImpl.run_command(command)
 
 class XDelta3DirPatcher(object):
     def __init__(self, args, delta_impl = XDeltaImpl):
@@ -66,7 +74,7 @@ class XDelta3DirPatcher(object):
         chown(dest_file,uid,gid)
 
     def _find_file_delta(self, rel_path, new_file, old_root, new_root, target_root):
-        print("\nProcessing %s" % new_file)
+        print("Processing %s" % new_file)
 
         target_path = path.join(target_root, rel_path)
         if not path.exists(target_path):
@@ -87,7 +95,7 @@ class XDelta3DirPatcher(object):
         self.copy_attributes(new_path, target_path)
 
     def _apply_file_delta(self, rel_path, patch_file, old_root, patch_root, target_root):
-        print("\nProcessing %s" % patch_file)
+        print("Processing %s" % patch_file)
 
         target_path = path.join(target_root, rel_path)
         if not path.exists(target_path):
@@ -104,19 +112,33 @@ class XDelta3DirPatcher(object):
         self.copy_attributes(patch_path, target_path)
 
     # TODO: Test me
-    def diff(self, old_dir, new_dir, target_dir):
+    def diff(self, old_dir, new_dir, patch_bundle):
+        # Cretate a temp dir
+        target_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
+        print("Using %s as staging area" % target_dir)
+
         delta_target_dir = path.join(target_dir, 'xdelta')
+        mkdir(delta_target_dir)
 
         for root, dirs, new_files in walk(new_dir):
             rel_path = path.relpath(root, new_dir)
 
             print('-'*10, root, '-'*10)
-            print(new_files)
+            if self.args.debug: print(new_files)
             for new_file in new_files:
                 self._find_file_delta(rel_path, new_file, old_dir, new_dir, delta_target_dir)
 
+        print("\nWriting archive...")
+        with tarfile.open(patch_bundle, 'w:gz', format=tarfile.GNU_FORMAT) as bundle:
+            bundle.add(delta_target_dir, arcname='xdelta')
+
+        print("Cleaning up...")
+        rmtree(target_dir)
+
+        print("Done")
+
     # TODO: Test me
-    def apply(self, old_dir, patch_dir, target_dir):
+    def apply(self, old_dir, patch_bundle, target_dir):
         delta_patch_dir = path.join(patch_dir, 'xdelta')
 
         for root, dirs, patch_files in walk(delta_patch_dir):
@@ -132,10 +154,10 @@ class XDelta3DirPatcher(object):
 
         if self.args.action == 'diff':
             print("Generating delta pack")
-            self.diff(self.args.old_dir, self.args.new_dir, self.args.target_dir)
+            self.diff(self.args.old_dir, self.args.new_dir, self.args.patch_bundle)
         else:
             print("Applying delta pack")
-            self.apply(self.args.old_dir, self.args.patch_dir, self.args.target_dir)
+            self.apply(self.args.old_dir, self.args.patch_bundle, self.args.target_dir)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Creates and applies XDelta3-based directory diff tgz files')
@@ -151,8 +173,8 @@ if __name__ == '__main__':
     parser_apply.add_argument('old_dir',
             help='Folder containing the old version of the files')
 
-    parser_apply.add_argument('patch_dir',
-            help='Folder containing the patches')
+    parser_apply.add_argument('patch_bundle',
+            help='File containing the patches')
 
     parser_apply.add_argument('target_dir',
             help='Destination folder for the new versions of files')
@@ -164,8 +186,8 @@ if __name__ == '__main__':
     parser_diff.add_argument('new_dir',
             help='Folder containing the new version of the files')
 
-    parser_diff.add_argument('target_dir',
-            help='Destination folder for the generated diff')
+    parser_diff.add_argument('patch_bundle',
+            help='Destination folder for the generated patch diff')
 
     # Generic arguments
     parser.add_argument('--debug',

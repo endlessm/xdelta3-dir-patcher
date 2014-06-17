@@ -1,6 +1,7 @@
 import unittest
 from mock import Mock
 from subprocess import CalledProcessError, check_output, STDOUT
+from os import remove
 
 # Dashes are standard for exec scipts but not allowed for modules in Python. We
 # use the script standard since we will be running that file as a script most
@@ -69,6 +70,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
     def test_diff_usage_is_not_printed_if_args_are_correct(self):
         output = check_output(["./%s" % self.EXECUTABLE, "diff", "foo", "bar", "baz"] )
         self.assertNotIn("usage: ", output)
+        remove("baz")
 
     def test_other_actions_are_not_allowed(self):
         try:
@@ -85,7 +87,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         args.action = 'diff'
         args.old_dir = 'old'
         args.new_dir = 'new'
-        args.target_dir = 'target'
+        args.patch_bundle = 'target'
 
         test_object = patcher.XDelta3DirPatcher(args)
         test_object.diff = Mock()
@@ -98,7 +100,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         args = patcher.AttributeDict()
         args.action = 'apply'
         args.old_dir = 'old'
-        args.patch_dir = 'patch'
+        args.patch_bundle = 'patch'
         args.target_dir = 'target'
 
         test_object = patcher.XDelta3DirPatcher(args)
