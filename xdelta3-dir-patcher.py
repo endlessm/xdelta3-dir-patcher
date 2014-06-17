@@ -29,6 +29,18 @@ class XDeltaImpl(object):
         if args.debug: print("Generating xdelta: %s" % command)
         call(command)
 
+    def apply(old_file, patch_file, target_file):
+        command = ['xdelta3', '-f', '-d']
+        if old_file:
+            command.append('-s')
+            command.append(old_file)
+
+        command.append(patch_file)
+        command.append(target_file)
+
+        if args.debug: print("Applying xdelta: %s" % command)
+        call(command)
+
 class XDelta3DirPatcher(object):
     def __init__(self, args):
         print("Initializing patcher")
