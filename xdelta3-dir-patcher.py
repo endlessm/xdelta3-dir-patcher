@@ -73,7 +73,7 @@ class XDelta3DirPatcher(object):
         delta_target_dir = path.join(target_dir, 'xdelta')
 
         for root, dirs, new_files in walk(new_dir):
-            rel_path = path.relpath(root, new_dir).split(sep)[0]
+            rel_path = path.relpath(root, new_dir)
 
             print('-'*10, root, '-'*10)
             print(new_files)
