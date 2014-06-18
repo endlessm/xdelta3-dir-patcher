@@ -138,12 +138,13 @@ class XDelta3DirPatcher(object):
         mkdir(delta_target_dir)
 
         for root, dirs, new_files in walk(new_dir):
+            print("Entering directory", root)
             rel_path = path.relpath(root, new_dir)
 
-            print('-'*10, root, '-'*10)
             if self.args.debug: print(new_files)
             for new_file in new_files:
                 self._find_file_delta(rel_path, new_file, old_dir, new_dir, delta_target_dir)
+            print("Leaving directory", root)
 
         print("\nWriting archive...")
         with tarfile.open(patch_bundle, 'w:gz', format=tarfile.GNU_FORMAT) as patch_archive:
@@ -168,12 +169,13 @@ class XDelta3DirPatcher(object):
 
         print("Applying patches")
         for root, dirs, patch_files in walk(delta_patch_dir):
+            print("Entering directory", root)
             rel_path = path.relpath(root, delta_patch_dir)
 
-            print('-'*10, rel_path, '-'*10)
             if self.args.debug: print(patch_files)
             for patch_file in patch_files:
                 self._apply_file_delta(rel_path, patch_file, old_dir, delta_patch_dir, target_dir)
+            print("Leaving directory", root)
 
         print("Cleaning up...")
         rmtree(patch_dir)
