@@ -3,7 +3,7 @@
 import argparse
 import tarfile
 
-from os import chmod, chown, geteuid, makedirs, mkdir, path, sep, stat, walk
+from os import chmod, chown, geteuid, makedirs, mkdir, path, sep, stat, walk, readlink, symlink
 from shutil import copymode, copystat, rmtree
 from subprocess import check_output, STDOUT
 from stat import *
@@ -77,44 +77,58 @@ class XDelta3DirPatcher(object):
     def _find_file_delta(self, rel_path, new_file, old_root, new_root, target_root):
         print("Processing %s" % new_file)
 
-        target_path = path.join(target_root, rel_path)
-        if not path.exists(target_path):
-            makedirs(target_path)
-
         old_path = path.join(old_root, rel_path, new_file)
         new_path = path.join(new_root, rel_path, new_file)
-        target_path = path.join(target_path, new_file)
+        target_path = path.join(target_root, rel_path, new_file)
 
         if args.debug: print([old_path, new_path, target_path])
 
-        if not path.isfile(old_path):
-            old_path = None
-            if args.debug: print("Old file not present. Ignoring source in XDelta")
+        if path.islink(new_path):
+            new_dst = readlink(new_path)
+            symlink(new_dst, target_path)
+            if args.debug: print("symlink: ", [target_path, new_dst])
 
-        self.delta_impl.diff(old_path, new_path, target_path, self.args.debug)
+        elif path.isdir(new_path):
+            mkdir(target_path)
+            self.copy_attributes(new_path, target_path)
 
-        self.copy_attributes(new_path, target_path)
+        else:
+            # Regular file
+            if not path.isfile(old_path):
+                old_path = None
+                if args.debug: print("Old file not present. Ignoring source in XDelta")
+
+            self.delta_impl.diff(old_path, new_path, target_path, self.args.debug)
+
+            self.copy_attributes(new_path, target_path)
 
     def _apply_file_delta(self, rel_path, patch_file, old_root, patch_root, target_root):
         print("Processing %s" % patch_file)
 
-        target_path = path.join(target_root, rel_path)
-        if not path.exists(target_path):
-            makedirs(target_path)
-
         old_path = path.join(old_root, rel_path, patch_file)
         patch_path = path.join(patch_root, rel_path, patch_file)
-        target_path = path.join(target_path, patch_file)
+        target_path = path.join(target_root, rel_path, patch_file)
 
         if args.debug: print([old_path, patch_path, target_path])
 
-        if not path.isfile(old_path):
-            old_path = None
-            if args.debug: print("Old file not present. Ignoring source in XDelta")
+        if path.islink(patch_path):
+            patch_dst = readlink(patch_path)
+            symlink(patch_dst, target_path)
+            if args.debug: print("symlink: ", [target_path, patch_dst])
 
-        self.delta_impl.apply(old_path, patch_path, target_path, self.args.debug)
+        elif path.isdir(patch_path):
+            mkdir(target_path)
+            self.copy_attributes(patch_path, target_path)
 
-        self.copy_attributes(patch_path, target_path)
+        else:
+            # Regular file
+            if not path.isfile(old_path):
+                old_path = None
+                if args.debug: print("Old file not present. Ignoring source in XDelta")
+
+            self.delta_impl.apply(old_path, patch_path, target_path, self.args.debug)
+
+            self.copy_attributes(patch_path, target_path)
 
     # TODO: Test me
     def diff(self, old_dir, new_dir, patch_bundle):
@@ -125,13 +139,20 @@ class XDelta3DirPatcher(object):
         delta_target_dir = path.join(target_dir, self.PATCH_FOLDER)
         mkdir(delta_target_dir)
 
-        for root, dirs, new_files in walk(new_dir):
+        for root, new_dirs, new_files in walk(new_dir):
+            print("Entering directory", root)
+
             rel_path = path.relpath(root, new_dir)
 
-            print('-'*10, root, '-'*10)
-            if self.args.debug: print(new_files)
+            if self.args.debug: print("- Subdirs:", new_dirs)
+            if self.args.debug: print("- Files:", new_files)
+
+            for new_dir1 in new_dirs:
+                self._find_file_delta(rel_path, new_dir1, old_dir, new_dir, delta_target_dir)
             for new_file in new_files:
                 self._find_file_delta(rel_path, new_file, old_dir, new_dir, delta_target_dir)
+
+            print("Leaving directory", root)
 
         print("\nWriting archive...")
         with tarfile.open(patch_bundle, 'w:gz', format=tarfile.GNU_FORMAT) as patch_archive:
@@ -155,13 +176,20 @@ class XDelta3DirPatcher(object):
         delta_patch_dir = path.join(patch_dir, self.PATCH_FOLDER)
 
         print("Applying patches")
-        for root, dirs, patch_files in walk(delta_patch_dir):
+        for root, patch_dirs, patch_files in walk(delta_patch_dir):
+            print("Entering directory", root)
+
             rel_path = path.relpath(root, delta_patch_dir)
 
-            print('-'*10, rel_path, '-'*10)
-            if self.args.debug: print(patch_files)
+            if self.args.debug: print("- Subdirs:", patch_dirs)
+            if self.args.debug: print("- Files:", patch_files)
+
+            for patch_dir1 in patch_dirs:
+                self._apply_file_delta(rel_path, patch_dir1, old_dir, delta_patch_dir, target_dir)
             for patch_file in patch_files:
                 self._apply_file_delta(rel_path, patch_file, old_dir, delta_patch_dir, target_dir)
+
+            print("Leaving directory", root)
 
         print("Cleaning up...")
         rmtree(patch_dir)

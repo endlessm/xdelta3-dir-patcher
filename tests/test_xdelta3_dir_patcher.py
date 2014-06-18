@@ -22,7 +22,8 @@ class TestXDelta3DirPatcher(unittest.TestCase):
     # Integration tests
     def test_version_is_correct(self):
         output = check_output(["./%s" % self.EXECUTABLE, '--version'],
-                               universal_newlines=True)
+                              stderr=STDOUT,
+                              universal_newlines=True)
         self.assertEqual(output, "%s v0.1\n" % self.EXECUTABLE)
 
     def test_help_is_available(self):
