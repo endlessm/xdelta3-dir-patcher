@@ -3,7 +3,7 @@
 import argparse
 import tarfile
 
-from os import chmod, chown, geteuid, makedirs, mkdir, path, sep, stat, walk
+from os import chmod, chown, geteuid, makedirs, mkdir, path, sep, stat, walk, readlink, symlink
 from shutil import copymode, copystat, rmtree
 from subprocess import check_output, STDOUT
 from stat import *
@@ -87,6 +87,12 @@ class XDelta3DirPatcher(object):
 
         if args.debug: print([old_path, new_path, target_path])
 
+        if path.islink(new_path):
+            new_dst = readlink(new_path)
+            symlink(new_dst, target_path)
+            if args.debug: print("symlink: ", [target_path, new_dst])
+            return
+
         if not path.isfile(old_path):
             old_path = None
             if args.debug: print("Old file not present. Ignoring source in XDelta")
@@ -107,6 +113,12 @@ class XDelta3DirPatcher(object):
         target_path = path.join(target_path, patch_file)
 
         if args.debug: print([old_path, patch_path, target_path])
+
+        if path.islink(patch_path):
+            patch_dst = readlink(patch_path)
+            symlink(patch_dst, target_path)
+            if args.debug: print("symlink: ", [target_path, patch_dst])
+            return
 
         if not path.isfile(old_path):
             old_path = None
