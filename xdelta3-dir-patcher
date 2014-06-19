@@ -3,6 +3,7 @@
 import argparse
 import tarfile
 
+from filecmp import dircmp
 from os import chmod, chown, geteuid, makedirs, mkdir, path, sep, stat, walk, readlink, symlink
 from shutil import copymode, copystat, rmtree
 from subprocess import check_output, STDOUT
@@ -118,7 +119,7 @@ class XDelta3DirPatcher(object):
             if args.debug: print("symlink: ", [target_path, patch_dst])
 
         elif path.isdir(patch_path):
-            mkdir(target_path)
+            makedirs(target_path, exist_ok = True)
             self.copy_attributes(patch_path, target_path)
 
         else:
@@ -175,6 +176,13 @@ class XDelta3DirPatcher(object):
             patch_archive.extractall(patch_dir)
 
         delta_patch_dir = path.join(patch_dir, self.PATCH_FOLDER)
+
+        print("Removing deleted files")
+        deleted_files = dircmp(delta_patch_dir, target_dir).right_only
+        for deleted_file in deleted_files:
+          rmtree(path.join(target_dir, deleted_file))
+          if self.args.debug: print("Deleted old path", deleted_file)
+
 
         print("Applying patches")
         for root, patch_dirs, patch_files in walk(delta_patch_dir):
