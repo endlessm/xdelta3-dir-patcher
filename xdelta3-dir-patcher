@@ -21,7 +21,7 @@ class AttributeDict(dict):
         self[attr] = value
 
 class XDelta3Impl(object):
-    # TODO: Test me
+    # TODO: Unit test me
     @staticmethod
     def run_command(args, exec_method = check_output):
         exec_method(args, stderr=STDOUT)
@@ -61,7 +61,7 @@ class XDelta3DirPatcher(object):
         self.args = args
         self.delta_impl = delta_impl
 
-    # TODO: Test me
+    # TODO: Unit test me
     def copy_attributes(self, src_file, dest_file):
         if args.debug: print("Copying mode data")
         copymode(src_file, dest_file)
@@ -132,7 +132,7 @@ class XDelta3DirPatcher(object):
 
             self.copy_attributes(patch_path, target_path)
 
-    # TODO: Test me
+    # TODO: Unit test me
     def diff(self, old_dir, new_dir, patch_bundle):
         # Cretate a temp dir
         target_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
@@ -165,7 +165,7 @@ class XDelta3DirPatcher(object):
 
         print("Done")
 
-    # TODO: Test me
+    # TODO: Unit test me
     def apply(self, old_dir, patch_bundle, target_dir):
         # Cretate a temp dir
         patch_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
