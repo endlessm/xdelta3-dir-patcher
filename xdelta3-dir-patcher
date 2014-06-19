@@ -3,6 +3,7 @@
 import argparse
 import tarfile
 
+from filecmp import dircmp
 from os import chmod, chown, geteuid, makedirs, mkdir, path, sep, stat, walk, readlink, symlink
 from shutil import copymode, copystat, rmtree
 from subprocess import check_output, STDOUT
@@ -20,7 +21,7 @@ class AttributeDict(dict):
         self[attr] = value
 
 class XDelta3Impl(object):
-    # TODO: Test me
+    # TODO: Unit test me
     @staticmethod
     def run_command(args, exec_method = check_output):
         exec_method(args, stderr=STDOUT)
@@ -60,7 +61,7 @@ class XDelta3DirPatcher(object):
         self.args = args
         self.delta_impl = delta_impl
 
-    # TODO: Test me
+    # TODO: Unit test me
     def copy_attributes(self, src_file, dest_file):
         if args.debug: print("Copying mode data")
         copymode(src_file, dest_file)
@@ -104,6 +105,7 @@ class XDelta3DirPatcher(object):
 
     def _apply_file_delta(self, rel_path, patch_file, old_root, patch_root, target_root):
         print("Processing %s" % patch_file)
+        makedirs(target_root, exist_ok = True)
 
         old_path = path.join(old_root, rel_path, patch_file)
         patch_path = path.join(patch_root, rel_path, patch_file)
@@ -117,7 +119,7 @@ class XDelta3DirPatcher(object):
             if args.debug: print("symlink: ", [target_path, patch_dst])
 
         elif path.isdir(patch_path):
-            mkdir(target_path)
+            makedirs(target_path, exist_ok = True)
             self.copy_attributes(patch_path, target_path)
 
         else:
@@ -130,7 +132,7 @@ class XDelta3DirPatcher(object):
 
             self.copy_attributes(patch_path, target_path)
 
-    # TODO: Test me
+    # TODO: Unit test me
     def diff(self, old_dir, new_dir, patch_bundle):
         # Cretate a temp dir
         target_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
@@ -163,7 +165,7 @@ class XDelta3DirPatcher(object):
 
         print("Done")
 
-    # TODO: Test me
+    # TODO: Unit test me
     def apply(self, old_dir, patch_bundle, target_dir):
         # Cretate a temp dir
         patch_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
@@ -174,6 +176,13 @@ class XDelta3DirPatcher(object):
             patch_archive.extractall(patch_dir)
 
         delta_patch_dir = path.join(patch_dir, self.PATCH_FOLDER)
+
+        print("Removing deleted files")
+        deleted_files = dircmp(delta_patch_dir, target_dir).right_only
+        for deleted_file in deleted_files:
+          rmtree(path.join(target_dir, deleted_file))
+          if self.args.debug: print("Deleted old path", deleted_file)
+
 
         print("Applying patches")
         for root, patch_dirs, patch_files in walk(delta_patch_dir):
@@ -213,6 +222,10 @@ class XDelta3DirPatcher(object):
             # user and group permissions are retained
             self.check_euid(self.args.ignore_euid)
 
+            # If no target dir specified, assume in-place update
+            if not self.args.target_dir:
+                self.args.target_dir = self.args.old_dir
+
             print("Applying delta pack")
             self.apply(self.args.old_dir, self.args.patch_bundle, self.args.target_dir)
 
@@ -234,6 +247,8 @@ if __name__ == '__main__':
             help='File containing the patches')
 
     parser_apply.add_argument('target_dir',
+            nargs='?',
+            default=None,
             help='Destination folder for the new versions of files')
 
     parser_apply.add_argument('--ignore-euid',

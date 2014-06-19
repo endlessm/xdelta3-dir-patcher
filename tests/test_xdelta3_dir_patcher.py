@@ -1,10 +1,11 @@
 import imp
 import unittest
+from filecmp import dircmp
 from mock import Mock
-from shutil import rmtree
+from shutil import rmtree, copytree
 from subprocess import CalledProcessError, check_output, STDOUT
 from tempfile import mkdtemp
-from os import path, remove
+from os import path, remove, walk
 
 # Dashes are standard for exec scipts but not allowed for modules in Python. We
 # use the script standard since we will be running that file as a script most
@@ -16,9 +17,59 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
     def setUp(self):
         self.temp_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
+        self.temp_dir2 = mkdtemp(prefix="%s_" % self.__class__.__name__)
 
     def tearDown(self):
         rmtree(self.temp_dir)
+        rmtree(self.temp_dir2)
+
+    # Full-spec intergation tests
+    def test_apply_patch_works(self):
+        old_path = path.join('tests', 'test_files', 'old_version1')
+        delta_path = path.join('tests', 'test_files', 'patch1.xdelta.tgz')
+        output = check_output(["./%s" % self.EXECUTABLE, "apply", old_path, delta_path, self.temp_dir, "--ignore-euid"] )
+
+        new_path = path.join('tests', 'test_files', 'new_version1')
+
+        diff = dircmp(self.temp_dir, new_path)
+
+        self.assertEquals([], diff.diff_files)
+        self.assertEquals([], diff.common_funny)
+        self.assertEquals([], diff.left_only)
+        self.assertEquals([], diff.right_only)
+
+    def test_apply_patch_works_with_old_files_present_in_target(self):
+        old_path = path.join('tests', 'test_files', 'old_version1')
+
+        rmtree(self.temp_dir)
+        copytree(old_path, self.temp_dir)
+
+        delta_path = path.join('tests', 'test_files', 'patch1.xdelta.tgz')
+        output = check_output(["./%s" % self.EXECUTABLE, "apply", self.temp_dir, delta_path, "--ignore-euid"] )
+
+        new_path = path.join('tests', 'test_files', 'new_version1')
+        diff = dircmp(self.temp_dir, new_path)
+
+        self.assertEquals([], diff.diff_files)
+        self.assertEquals([], diff.common_funny)
+        self.assertEquals([], diff.left_only)
+        self.assertEquals([], diff.right_only)
+
+    def test_diff_works(self):
+        # Implicit dependency on previous apply integration test
+        old_path = path.join('tests', 'test_files', 'old_version1')
+        new_path = path.join('tests', 'test_files', 'new_version1')
+        generated_delta_path = path.join(self.temp_dir2, 'patch.xdelta')
+
+        check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_path, generated_delta_path] )
+        check_output(["./%s" % self.EXECUTABLE, "apply", old_path, generated_delta_path, self.temp_dir, "--ignore-euid"] )
+
+        diff = dircmp(self.temp_dir, new_path)
+
+        self.assertEquals([], diff.diff_files)
+        self.assertEquals([], diff.common_funny)
+        self.assertEquals([], diff.left_only)
+        self.assertEquals([], diff.right_only)
 
     # Integration tests
     def test_version_is_correct(self):
@@ -60,6 +111,16 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         old_path = path.join('tests', 'test_files', 'old_version1')
         delta_path = path.join('tests', 'test_files', 'patch1.xdelta.tgz')
         output = check_output(["./%s" % self.EXECUTABLE, "apply", old_path, delta_path, self.temp_dir, "--ignore-euid"] )
+        self.assertNotIn("usage: ", output)
+
+    def test_apply_usage_is_not_printed_if_args_are_correct2(self):
+        old_path = path.join('tests', 'test_files', 'old_version1')
+
+        rmtree(self.temp_dir)
+        copytree(old_path, self.temp_dir)
+
+        delta_path = path.join('tests', 'test_files', 'patch1.xdelta.tgz')
+        output = check_output(["./%s" % self.EXECUTABLE, "apply", self.temp_dir, delta_path, "--ignore-euid"] )
         self.assertNotIn("usage: ", output)
 
     def test_diff_usage_is_printed_if_not_enough_args(self):
@@ -124,6 +185,21 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         test_object.run()
 
         test_object.apply.assert_called_once_with('old', 'patch', 'target')
+
+    def test_run_calls_apply_with_correct_arguments_if_action_is_apply_and_no_target_specified(self):
+        args = patcher.AttributeDict()
+        args.action = 'apply'
+        args.old_dir = 'old'
+        args.patch_bundle = 'patch'
+        args.ignore_euid = True
+        args.target_dir = None
+
+        test_object = patcher.XDelta3DirPatcher(args)
+        test_object.apply = Mock()
+
+        test_object.run()
+
+        test_object.apply.assert_called_once_with('old', 'patch', 'old')
 
     def test_check_euid_does_not_break_if_ignoring_euid(self):
         # Implicit: Does not throw error
