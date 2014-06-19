@@ -1,0 +1,13 @@
+Source: xdelta3-dir-patcher
+Maintainer: Endless Mobile <maintainers@endlessm.com>
+Section: utils
+Priority: standard
+Build-Depends: python-setuptools (>= 0.6b3), python (>= 3.0), debhelper (>= 9), xdelta3
+Standards-Version: 3.9.1
+
+Package: xdelta3-dir-patcher
+Provides: bundle-diff
+Architecture: all
+Depends: ${misc:Depends}, ${python:Depends}
+Description: Tool to create xdelta3 bundled diffs
+ Tool to create xdelta3 bundled diffs of directories
