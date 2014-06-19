@@ -222,6 +222,10 @@ class XDelta3DirPatcher(object):
             # user and group permissions are retained
             self.check_euid(self.args.ignore_euid)
 
+            # If no target dir specified, assume in-place update
+            if not self.args.target_dir:
+                self.args.target_dir = self.args.old_dir
+
             print("Applying delta pack")
             self.apply(self.args.old_dir, self.args.patch_bundle, self.args.target_dir)
 
@@ -243,6 +247,8 @@ if __name__ == '__main__':
             help='File containing the patches')
 
     parser_apply.add_argument('target_dir',
+            nargs='?',
+            default=None,
             help='Destination folder for the new versions of files')
 
     parser_apply.add_argument('--ignore-euid',

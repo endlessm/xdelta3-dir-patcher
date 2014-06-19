@@ -45,7 +45,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         copytree(old_path, self.temp_dir)
 
         delta_path = path.join('tests', 'test_files', 'patch1.xdelta.tgz')
-        output = check_output(["./%s" % self.EXECUTABLE, "apply", self.temp_dir, delta_path, self.temp_dir, "--ignore-euid"] )
+        output = check_output(["./%s" % self.EXECUTABLE, "apply", self.temp_dir, delta_path, "--ignore-euid"] )
 
         new_path = path.join('tests', 'test_files', 'new_version1')
         diff = dircmp(self.temp_dir, new_path)
@@ -113,6 +113,16 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         output = check_output(["./%s" % self.EXECUTABLE, "apply", old_path, delta_path, self.temp_dir, "--ignore-euid"] )
         self.assertNotIn("usage: ", output)
 
+    def test_apply_usage_is_not_printed_if_args_are_correct2(self):
+        old_path = path.join('tests', 'test_files', 'old_version1')
+
+        rmtree(self.temp_dir)
+        copytree(old_path, self.temp_dir)
+
+        delta_path = path.join('tests', 'test_files', 'patch1.xdelta.tgz')
+        output = check_output(["./%s" % self.EXECUTABLE, "apply", self.temp_dir, delta_path, "--ignore-euid"] )
+        self.assertNotIn("usage: ", output)
+
     def test_diff_usage_is_printed_if_not_enough_args(self):
         try:
             check_output(["./%s" % self.EXECUTABLE, "diff"],
@@ -175,6 +185,21 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         test_object.run()
 
         test_object.apply.assert_called_once_with('old', 'patch', 'target')
+
+    def test_run_calls_apply_with_correct_arguments_if_action_is_apply_and_no_target_specified(self):
+        args = patcher.AttributeDict()
+        args.action = 'apply'
+        args.old_dir = 'old'
+        args.patch_bundle = 'patch'
+        args.ignore_euid = True
+        args.target_dir = None
+
+        test_object = patcher.XDelta3DirPatcher(args)
+        test_object.apply = Mock()
+
+        test_object.run()
+
+        test_object.apply.assert_called_once_with('old', 'patch', 'old')
 
     def test_check_euid_does_not_break_if_ignoring_euid(self):
         # Implicit: Does not throw error
