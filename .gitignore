@@ -14,3 +14,6 @@ coverage.xml
 *.mo
 
 *.swp
+
+# Byte-compiled test artifact
+xdelta3-dir-patcherc

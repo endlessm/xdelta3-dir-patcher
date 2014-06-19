@@ -1,3 +1,4 @@
+import imp
 import unittest
 from mock import Mock
 from shutil import rmtree
@@ -8,10 +9,10 @@ from os import path, remove
 # Dashes are standard for exec scipts but not allowed for modules in Python. We
 # use the script standard since we will be running that file as a script most
 # often.
-patcher = __import__("xdelta3-dir-patcher")
+patcher = imp.load_source("xdelta3-dir-patcher", "xdelta3-dir-patcher")
 
 class TestXDelta3DirPatcher(unittest.TestCase):
-    EXECUTABLE="xdelta3-dir-patcher.py"
+    EXECUTABLE="xdelta3-dir-patcher"
 
     def setUp(self):
         self.temp_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
