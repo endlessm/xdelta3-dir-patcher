@@ -23,7 +23,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         rmtree(self.temp_dir)
         rmtree(self.temp_dir2)
 
-    # Full-spec intergation tests
+    # Full-spec integration tests
     def test_apply_patch_works(self):
         old_path = path.join('tests', 'test_files', 'old_version1')
         delta_path = path.join('tests', 'test_files', 'patch1.xdelta.tgz')
