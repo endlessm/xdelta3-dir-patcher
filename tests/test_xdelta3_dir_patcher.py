@@ -58,11 +58,42 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         self.assertEquals([], diff.left_only)
         self.assertEquals([], diff.right_only)
 
+    def test_apply_works_with_symbolic_links_present(self):
+        old_path = path.join('tests', 'test_files', 'old_version_symlinks1')
+        delta_path = path.join('tests', 'test_files', 'patch_symlinks1.xdelta.tgz')
+
+        check_output(["./%s" % self.EXECUTABLE, "apply", old_path, delta_path, self.temp_dir, "--ignore-euid"] )
+
+        new_path = path.join('tests', 'test_files', 'new_version_symlinks1')
+        diff = dircmp(self.temp_dir, new_path)
+
+        self.assertEquals([], diff.diff_files)
+        self.assertEquals([], diff.common_funny)
+        self.assertEquals([], diff.left_only)
+        self.assertEquals([], diff.right_only)
+
     def test_diff_works(self):
         # Implicit dependency on previous apply integration test
         old_path = path.join('tests', 'test_files', 'old_version1')
         new_path = path.join('tests', 'test_files', 'new_version1')
         generated_delta_path = path.join(self.temp_dir2, 'patch.xdelta')
+
+        check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_path, generated_delta_path] )
+        check_output(["./%s" % self.EXECUTABLE, "apply", old_path, generated_delta_path, self.temp_dir, "--ignore-euid"] )
+
+        diff = dircmp(self.temp_dir, new_path)
+
+        self.assertEquals([], diff.diff_files)
+        self.assertEquals([], diff.common_funny)
+        self.assertEquals([], diff.left_only)
+        self.assertEquals([], diff.right_only)
+
+    def test_diff_works_with_symbolic_links_present(self):
+        # Implicit dependency on previous apply integration test
+        old_path = path.join('tests', 'test_files', 'old_version_symlinks1')
+        new_path = path.join('tests', 'test_files', 'new_version_symlinks1')
+
+        generated_delta_path = path.join(self.temp_dir2, 'patch_symlinks.xdelta')
 
         check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_path, generated_delta_path] )
         check_output(["./%s" % self.EXECUTABLE, "apply", old_path, generated_delta_path, self.temp_dir, "--ignore-euid"] )
