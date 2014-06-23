@@ -5,7 +5,8 @@ from mock import Mock
 from shutil import rmtree, copytree
 from subprocess import CalledProcessError, check_output, STDOUT
 from tempfile import mkdtemp
-from os import path, remove, walk
+from os import path, remove, walk, chmod
+from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH
 
 # Dashes are standard for exec scipts but not allowed for modules in Python. We
 # use the script standard since we will be running that file as a script most
@@ -17,7 +18,9 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
     def setUp(self):
         self.temp_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
+        chmod(self.temp_dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
         self.temp_dir2 = mkdtemp(prefix="%s_" % self.__class__.__name__)
+        chmod(self.temp_dir2, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
 
     def tearDown(self):
         rmtree(self.temp_dir)
