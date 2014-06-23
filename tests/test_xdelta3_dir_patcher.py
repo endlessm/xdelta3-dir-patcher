@@ -5,7 +5,8 @@ from mock import Mock
 from shutil import rmtree, copytree
 from subprocess import CalledProcessError, check_output, STDOUT
 from tempfile import mkdtemp
-from os import path, remove, walk
+from os import path, remove, walk, chmod
+from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH
 
 # Dashes are standard for exec scipts but not allowed for modules in Python. We
 # use the script standard since we will be running that file as a script most
@@ -17,13 +18,15 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
     def setUp(self):
         self.temp_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
+        chmod(self.temp_dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
         self.temp_dir2 = mkdtemp(prefix="%s_" % self.__class__.__name__)
+        chmod(self.temp_dir2, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
 
     def tearDown(self):
         rmtree(self.temp_dir)
         rmtree(self.temp_dir2)
 
-    # Full-spec intergation tests
+    # Full-spec integration tests
     def test_apply_patch_works(self):
         old_path = path.join('tests', 'test_files', 'old_version1')
         delta_path = path.join('tests', 'test_files', 'patch1.xdelta.tgz')
@@ -55,11 +58,42 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         self.assertEquals([], diff.left_only)
         self.assertEquals([], diff.right_only)
 
+    def test_apply_works_with_symbolic_links_present(self):
+        old_path = path.join('tests', 'test_files', 'old_version_symlinks1')
+        delta_path = path.join('tests', 'test_files', 'patch_symlinks1.xdelta.tgz')
+
+        check_output(["./%s" % self.EXECUTABLE, "apply", old_path, delta_path, self.temp_dir, "--ignore-euid"] )
+
+        new_path = path.join('tests', 'test_files', 'new_version_symlinks1')
+        diff = dircmp(self.temp_dir, new_path)
+
+        self.assertEquals([], diff.diff_files)
+        self.assertEquals([], diff.common_funny)
+        self.assertEquals([], diff.left_only)
+        self.assertEquals([], diff.right_only)
+
     def test_diff_works(self):
         # Implicit dependency on previous apply integration test
         old_path = path.join('tests', 'test_files', 'old_version1')
         new_path = path.join('tests', 'test_files', 'new_version1')
         generated_delta_path = path.join(self.temp_dir2, 'patch.xdelta')
+
+        check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_path, generated_delta_path] )
+        check_output(["./%s" % self.EXECUTABLE, "apply", old_path, generated_delta_path, self.temp_dir, "--ignore-euid"] )
+
+        diff = dircmp(self.temp_dir, new_path)
+
+        self.assertEquals([], diff.diff_files)
+        self.assertEquals([], diff.common_funny)
+        self.assertEquals([], diff.left_only)
+        self.assertEquals([], diff.right_only)
+
+    def test_diff_works_with_symbolic_links_present(self):
+        # Implicit dependency on previous apply integration test
+        old_path = path.join('tests', 'test_files', 'old_version_symlinks1')
+        new_path = path.join('tests', 'test_files', 'new_version_symlinks1')
+
+        generated_delta_path = path.join(self.temp_dir2, 'patch_symlinks.xdelta')
 
         check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_path, generated_delta_path] )
         check_output(["./%s" % self.EXECUTABLE, "apply", old_path, generated_delta_path, self.temp_dir, "--ignore-euid"] )
