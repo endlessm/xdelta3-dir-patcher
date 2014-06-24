@@ -215,12 +215,39 @@ class XDelta3DirPatcher(object):
             stderr.write("ERROR: You must be root to apply the delta! Exiting.\n")
             raise Exception()
 
+    @classmethod
+    def expand_archive(clazz, archive, tar_impl = tarfile):
+        expansion_dir = mkdtemp(prefix="%s_" % clazz.__name__)
+        print("Expanding %s into %s" % (path.basename(archive), expansion_dir))
+
+        with tar_impl.open(archive) as version_archive:
+            version_archive.extractall(expansion_dir)
+
+        return expansion_dir
+
     def run(self):
         print("Running directory patcher...")
 
         if self.args.action == 'diff':
+            dirs_to_clean = []
+
+            if self.args.debug: print("Parsing arguments")
+            old_dir = self.args.old_version
+            if path.isfile(self.args.old_version):
+                old_dir = self.expand_archive(self.args.old_version)
+                dirs_to_clean.append(old_dir)
+
+            new_dir = self.args.new_version
+            if path.isfile(self.args.new_version):
+                new_dir = self.expand_archive(self.args.new_version)
+                dirs_to_clean.append(new_dir)
+
             print("Generating delta pack")
-            self.diff(self.args.old_dir, self.args.new_dir, self.args.patch_bundle)
+            self.diff(old_dir, new_dir, self.args.patch_bundle)
+
+            if self.args.debug: print("Cleaning up")
+            for deletion_dir in dirs_to_clean:
+                rmtree(deletion_dir)
         else:
             # If we're not the root user, bail since we can't ensure that the
             # user and group permissions are retained
@@ -241,7 +268,7 @@ if __name__ == '__main__':
             help='Apply a diff from a directory. See "apply -help" for more options')
 
     parser_diff = subparsers.add_parser('diff',
-            help='Generate a diff from a directory. See "diff -help" for more options')
+            help='Generate a diff from directories/files. See "diff -help" for more options')
 
     # Arguments to apply a diff
     parser_apply.add_argument('old_dir',
@@ -261,14 +288,14 @@ if __name__ == '__main__':
             action='store_true')
 
     # Arguments to create a diff
-    parser_diff.add_argument('old_dir',
-            help='Folder containing the old version of the files')
+    parser_diff.add_argument('old_version',
+            help='Folder or tgz containing the old version of the files')
 
-    parser_diff.add_argument('new_dir',
-            help='Folder containing the new version of the files')
+    parser_diff.add_argument('new_version',
+            help='Folder or tgz containing the new version of the files')
 
     parser_diff.add_argument('patch_bundle',
-            help='Destination folder for the generated patch diff')
+            help='Destination path for the generated patch diff')
 
     # Generic arguments
     parser.add_argument('--debug',
