@@ -1,7 +1,7 @@
 xdelta3-dir-patcher
 ===================
 
-### Usage:
+### Usage
 ```
 usage: xdelta3-dir-patcher [-h] [--debug] [--version] {apply,diff} ...
 
