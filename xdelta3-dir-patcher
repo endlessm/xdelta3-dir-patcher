@@ -105,7 +105,9 @@ class XDelta3DirPatcher(object):
 
     def _apply_file_delta(self, rel_path, patch_file, old_root, patch_root, target_root):
         print("Processing %s" % patch_file)
-        makedirs(target_root, exist_ok = True)
+
+        if not path.isdir(target_root):
+            makedirs(target_root)
 
         old_path = path.join(old_root, rel_path, patch_file)
         patch_path = path.join(patch_root, rel_path, patch_file)
@@ -119,7 +121,8 @@ class XDelta3DirPatcher(object):
             if args.debug: print("symlink: ", [target_path, patch_dst])
 
         elif path.isdir(patch_path):
-            makedirs(target_path, exist_ok = True)
+            if not path.isdir(target_path):
+                makedirs(target_path)
             self.copy_attributes(patch_path, target_path)
 
         else:
