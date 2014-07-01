@@ -5,7 +5,8 @@ from mock import Mock
 from shutil import rmtree, copytree
 from subprocess import CalledProcessError, check_output, STDOUT
 from tempfile import mkdtemp
-from os import path, remove, walk
+from os import path, remove, walk, chmod
+from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH
 
 # Dashes are standard for exec scipts but not allowed for modules in Python. We
 # use the script standard since we will be running that file as a script most
@@ -17,13 +18,24 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
     def setUp(self):
         self.temp_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
+        chmod(self.temp_dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
         self.temp_dir2 = mkdtemp(prefix="%s_" % self.__class__.__name__)
+        chmod(self.temp_dir2, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
 
     def tearDown(self):
         rmtree(self.temp_dir)
         rmtree(self.temp_dir2)
 
-    # Full-spec intergation tests
+    # Helpers
+    def compare_trees(self, first, second):
+        diff = dircmp(first, second)
+
+        self.assertEquals([], diff.diff_files)
+        self.assertEquals([], diff.common_funny)
+        self.assertEquals([], diff.left_only)
+        self.assertEquals([], diff.right_only)
+
+    # Full-spec integration tests
     def test_apply_patch_works(self):
         old_path = path.join('tests', 'test_files', 'old_version1')
         delta_path = path.join('tests', 'test_files', 'patch1.xdelta.tgz')
@@ -31,12 +43,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
         new_path = path.join('tests', 'test_files', 'new_version1')
 
-        diff = dircmp(self.temp_dir, new_path)
-
-        self.assertEquals([], diff.diff_files)
-        self.assertEquals([], diff.common_funny)
-        self.assertEquals([], diff.left_only)
-        self.assertEquals([], diff.right_only)
+        self.compare_trees(self.temp_dir, new_path)
 
     def test_apply_patch_works_with_old_files_present_in_target(self):
         old_path = path.join('tests', 'test_files', 'old_version1')
@@ -48,12 +55,16 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         output = check_output(["./%s" % self.EXECUTABLE, "apply", self.temp_dir, delta_path, "--ignore-euid"] )
 
         new_path = path.join('tests', 'test_files', 'new_version1')
-        diff = dircmp(self.temp_dir, new_path)
+        self.compare_trees(self.temp_dir, new_path)
 
-        self.assertEquals([], diff.diff_files)
-        self.assertEquals([], diff.common_funny)
-        self.assertEquals([], diff.left_only)
-        self.assertEquals([], diff.right_only)
+    def test_apply_works_with_symbolic_links_present(self):
+        old_path = path.join('tests', 'test_files', 'old_version_symlinks1')
+        delta_path = path.join('tests', 'test_files', 'patch_symlinks1.xdelta.tgz')
+
+        check_output(["./%s" % self.EXECUTABLE, "apply", old_path, delta_path, self.temp_dir, "--ignore-euid"] )
+
+        new_path = path.join('tests', 'test_files', 'new_version_symlinks1')
+        self.compare_trees(self.temp_dir, new_path)
 
     def test_diff_works(self):
         # Implicit dependency on previous apply integration test
@@ -64,12 +75,56 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_path, generated_delta_path] )
         check_output(["./%s" % self.EXECUTABLE, "apply", old_path, generated_delta_path, self.temp_dir, "--ignore-euid"] )
 
-        diff = dircmp(self.temp_dir, new_path)
+        self.compare_trees(self.temp_dir, new_path)
 
-        self.assertEquals([], diff.diff_files)
-        self.assertEquals([], diff.common_funny)
-        self.assertEquals([], diff.left_only)
-        self.assertEquals([], diff.right_only)
+    def test_diff_works_with_both_files_as_arguments(self):
+        # Implicit dependency on apply integration test
+        old_path = path.join('tests', 'test_files', 'old_version1')
+        old_bundle = path.join('tests', 'test_files', 'old_version1.tgz')
+        new_path = path.join('tests', 'test_files', 'new_version1')
+        new_bundle = path.join('tests', 'test_files', 'new_version1.tgz')
+        generated_delta_path = path.join(self.temp_dir2, 'patch.xdelta')
+
+        check_output(["./%s" % self.EXECUTABLE, "diff", old_bundle, new_bundle, generated_delta_path] )
+        check_output(["./%s" % self.EXECUTABLE, "apply", old_path, generated_delta_path, self.temp_dir, "--ignore-euid"] )
+
+        self.compare_trees(self.temp_dir, new_path)
+
+    def test_diff_works_with_old_file_as_arguments(self):
+        # Implicit dependency on apply integration test
+        old_path = path.join('tests', 'test_files', 'old_version1')
+        old_bundle = path.join('tests', 'test_files', 'old_version1.tgz')
+        new_path = path.join('tests', 'test_files', 'new_version1')
+        generated_delta_path = path.join(self.temp_dir2, 'patch.xdelta')
+
+        check_output(["./%s" % self.EXECUTABLE, "diff", old_bundle, new_path, generated_delta_path] )
+        check_output(["./%s" % self.EXECUTABLE, "apply", old_path, generated_delta_path, self.temp_dir, "--ignore-euid"] )
+
+        self.compare_trees(self.temp_dir, new_path)
+
+    def test_diff_works_with_new_file_as_arguments(self):
+        # Implicit dependency on apply integration test
+        old_path = path.join('tests', 'test_files', 'old_version1')
+        new_path = path.join('tests', 'test_files', 'new_version1')
+        new_bundle = path.join('tests', 'test_files', 'new_version1.tgz')
+        generated_delta_path = path.join(self.temp_dir2, 'patch.xdelta')
+
+        check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_bundle, generated_delta_path] )
+        check_output(["./%s" % self.EXECUTABLE, "apply", old_path, generated_delta_path, self.temp_dir, "--ignore-euid"] )
+
+        self.compare_trees(self.temp_dir, new_path)
+
+    def test_diff_works_with_symbolic_links_present(self):
+        # Implicit dependency on previous apply integration test
+        old_path = path.join('tests', 'test_files', 'old_version_symlinks1')
+        new_path = path.join('tests', 'test_files', 'new_version_symlinks1')
+
+        generated_delta_path = path.join(self.temp_dir2, 'patch_symlinks.xdelta')
+
+        check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_path, generated_delta_path] )
+        check_output(["./%s" % self.EXECUTABLE, "apply", old_path, generated_delta_path, self.temp_dir, "--ignore-euid"] )
+
+        self.compare_trees(self.temp_dir, new_path)
 
     # Integration tests
     def test_version_is_correct(self):
@@ -160,9 +215,10 @@ class TestXDelta3DirPatcher(unittest.TestCase):
     def test_run_calls_diff_with_correct_arguments_if_action_is_diff(self):
         args = patcher.AttributeDict()
         args.action = 'diff'
-        args.old_dir = 'old'
-        args.new_dir = 'new'
+        args.old_version = 'old'
+        args.new_version = 'new'
         args.patch_bundle = 'target'
+        args.debug = False
 
         test_object = patcher.XDelta3DirPatcher(args)
         test_object.diff = Mock()
@@ -219,6 +275,17 @@ class TestXDelta3DirPatcher(unittest.TestCase):
             pass
         else:
             fail("Should have thrown exception")
+
+    def test_expand_archive_works(self):
+        archive = path.join('tests', 'test_files', 'old_version1.tgz')
+        old_dir = path.join('tests', 'test_files', 'old_version1')
+
+        result_dir = patcher.XDelta3DirPatcher.expand_archive(archive)
+
+        self.compare_trees(result_dir, old_dir)
+
+        # Clean up
+        rmtree(result_dir)
 
     # ------------------- XDeltaImpl tests
     def test_xdelta_impl_run_command_invokes_the_command(self):
