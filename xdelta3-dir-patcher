@@ -2,6 +2,7 @@
 
 import argparse
 import tarfile
+import zipfile
 
 from filecmp import dircmp
 from os import chmod, chown, geteuid, makedirs, mkdir, path, readlink, remove, symlink, sep, stat, walk
@@ -137,7 +138,7 @@ class XDelta3DirPatcher(object):
 
     # TODO: Unit test me
     def diff(self, old_dir, new_dir, patch_bundle):
-        # Cretate a temp dir
+        # Create a temp dir
         target_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
         print("Using %s as staging area" % target_dir)
 
@@ -170,7 +171,7 @@ class XDelta3DirPatcher(object):
 
     # TODO: Unit test me
     def apply(self, old_dir, patch_bundle, target_dir):
-        # Cretate a temp dir
+        # Create a temp dir
         patch_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
         print("Using %s as staging area" % patch_dir)
 
@@ -219,13 +220,17 @@ class XDelta3DirPatcher(object):
             raise Exception()
 
     @classmethod
-    def expand_archive(clazz, archive, tar_impl = tarfile):
+    def expand_archive(clazz, archive):
         expansion_dir = mkdtemp(prefix="%s_" % clazz.__name__)
         print("Expanding %s into %s" % (path.basename(archive), expansion_dir))
 
-        with tar_impl.open(archive) as version_archive:
-            version_archive.extractall(expansion_dir)
-
+        if zipfile.is_zipfile(archive):
+            with zipfile.ZipFile(archive) as version_archive:
+                version_archive.extractall(expansion_dir)
+        if tarfile.is_tarfile(archive):
+            with tarfile.open(archive) as version_archive:
+                version_archive.extractall(expansion_dir)
+            
         return expansion_dir
 
     def run(self):
