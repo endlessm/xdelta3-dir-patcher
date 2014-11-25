@@ -1,3 +1,9 @@
+xdelta3-dir-patcher (0.2) unstable; urgency=medium
+
+  * Fixed problems with creation of target directories
+
+ -- Srdjan Grubor <sgnn7@sgnn7.org>  Wed, 26 Nov 2014 17:07:23 -0500
+
 xdelta3-dir-patcher (0.1) unstable; urgency=medium
 
   * Initial packaging
