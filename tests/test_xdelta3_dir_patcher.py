@@ -45,6 +45,17 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
         self.compare_trees(self.temp_dir, new_path)
 
+    def test_apply_patch_creates_target_dir(self):
+        old_path = path.join('tests', 'test_files', 'old_version1')
+        delta_path = path.join('tests', 'test_files', 'patch1.xdelta.tgz')
+
+        rmtree(self.temp_dir)
+        output = check_output(["./%s" % self.EXECUTABLE, "apply", old_path, delta_path, self.temp_dir, "--ignore-euid"] )
+
+        new_path = path.join('tests', 'test_files', 'new_version1')
+
+        self.compare_trees(self.temp_dir, new_path)
+
     def test_apply_patch_works_with_old_files_present_in_target(self):
         old_path = path.join('tests', 'test_files', 'old_version1')
 
