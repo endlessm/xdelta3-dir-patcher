@@ -2,7 +2,3 @@
 
 %:
 	dh $@ --with python3
-
-# Use hardcoded 3.2 since Ubuntu shoves (>=3.2~) version, making Debian break
-override_dh_python3:
-	dh_python3 -V 3.2
