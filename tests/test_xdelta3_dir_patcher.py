@@ -45,6 +45,22 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
         self.compare_trees(self.temp_dir, new_path)
 
+    def test_apply_patch_works_with_root_dir_specified(self):
+        old_path = path.join('tests', 'test_files', 'old_version1')
+        delta_path = path.join('tests', 'test_files', 'patch2.xdelta.tgz')
+        output = check_output(["./%s" % self.EXECUTABLE,
+                               "apply",
+                               "-d", "inner_dir",
+                               old_path,
+                               delta_path,
+                               self.temp_dir,
+                               "--ignore-euid"] )
+
+        new_path = path.join('tests', 'test_files', 'new_version1')
+
+        self.compare_trees(self.temp_dir, new_path)
+
+
     def test_apply_patch_creates_target_dir(self):
         old_path = path.join('tests', 'test_files', 'old_version1')
         delta_path = path.join('tests', 'test_files', 'patch1.xdelta.tgz')
@@ -64,6 +80,23 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
         delta_path = path.join('tests', 'test_files', 'patch1.xdelta.tgz')
         output = check_output(["./%s" % self.EXECUTABLE, "apply", self.temp_dir, delta_path, "--ignore-euid"] )
+
+        new_path = path.join('tests', 'test_files', 'new_version1')
+        self.compare_trees(self.temp_dir, new_path)
+
+    def test_apply_patch_works_with_old_files_present_in_target_with_root_patch_dir(self):
+        old_path = path.join('tests', 'test_files', 'old_version1')
+
+        rmtree(self.temp_dir)
+        copytree(old_path, self.temp_dir)
+
+        delta_path = path.join('tests', 'test_files', 'patch2.xdelta.tgz')
+        output = check_output(["./%s" % self.EXECUTABLE,
+                               "apply",
+                               "-d", "inner_dir",
+                               self.temp_dir,
+                               delta_path,
+                               "--ignore-euid"] )
 
         new_path = path.join('tests', 'test_files', 'new_version1')
         self.compare_trees(self.temp_dir, new_path)
@@ -142,7 +175,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         output = check_output(["./%s" % self.EXECUTABLE, '--version'],
                               stderr=STDOUT,
                               universal_newlines=True)
-        self.assertEqual(output, "%s v0.1\n" % self.EXECUTABLE)
+        self.assertEqual(output, "%s v0.3\n" % self.EXECUTABLE)
 
     def test_help_is_available(self):
         self.assertIsNotNone(check_output(["./%s" % self.EXECUTABLE, '-h']))
@@ -245,13 +278,31 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         args.patch_bundle = 'patch'
         args.ignore_euid = True
         args.target_dir = 'target'
+        args.root_patch_dir = None
 
         test_object = patcher.XDelta3DirPatcher(args)
         test_object.apply = Mock()
 
         test_object.run()
 
-        test_object.apply.assert_called_once_with('old', 'patch', 'target')
+        test_object.apply.assert_called_once_with('old', 'patch', 'target', None)
+
+    def test_run_calls_apply_with_correct_arguments_if_action_is_apply_and_root_is_specified(self):
+        args = patcher.AttributeDict()
+        args.action = 'apply'
+        args.old_dir = 'old'
+        args.patch_bundle = 'patch'
+        args.ignore_euid = True
+        args.target_dir = 'target'
+        args.root_patch_dir = 'foobar'
+
+        test_object = patcher.XDelta3DirPatcher(args)
+        test_object.apply = Mock()
+
+        test_object.run()
+
+        test_object.apply.assert_called_once_with('old', 'patch', 'target', 'foobar')
+
 
     def test_run_calls_apply_with_correct_arguments_if_action_is_apply_and_no_target_specified(self):
         args = patcher.AttributeDict()
@@ -260,13 +311,14 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         args.patch_bundle = 'patch'
         args.ignore_euid = True
         args.target_dir = None
+        args.root_patch_dir = None
 
         test_object = patcher.XDelta3DirPatcher(args)
         test_object.apply = Mock()
 
         test_object.run()
 
-        test_object.apply.assert_called_once_with('old', 'patch', 'old')
+        test_object.apply.assert_called_once_with('old', 'patch', 'old', None)
 
     def test_check_euid_does_not_break_if_ignoring_euid(self):
         # Implicit: Does not throw error
@@ -330,7 +382,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         original_run_command = test_class.run_command
         test_class.run_command = Mock()
 
-        test_class.apply("old", "patch", "target")
+        test_class.apply("old", "patch", "target", None)
 
         test_class.run_command.assert_called_once_with(['xdelta3', '-f', '-d', '-s', 'old', 'patch', 'target'])
 
@@ -341,7 +393,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         original_run_command = test_class.run_command
         test_class.run_command = Mock()
 
-        test_class.apply(None, "patch", "target")
+        test_class.apply(None, "patch", "target", None)
 
         test_class.run_command.assert_called_once_with(['xdelta3', '-f', '-d', 'patch', 'target'])
 
