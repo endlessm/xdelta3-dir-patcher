@@ -1,3 +1,17 @@
+xdelta3-dir-patcher (0.2-2) unstable; urgency=medium
+
+  * There were problems with distributions without python3.2 available
+    so now we manually set the versions (3.2-4.0) as dh_python is useless
+    here.
+
+ -- Srdjan Grubor <sgnn7@sgnn7.org>  Tue, 09 Dec 2014 10:40:37 -0600
+
+xdelta3-dir-patcher (0.2-1) unstable; urgency=medium
+
+  * Made the package be installable on Debian (bad dh_python3 dep generation).
+
+ -- Srdjan Grubor <sgnn7@sgnn7.org>  Mon, 8 Dec 2014 14:18:13 -0500
+
 xdelta3-dir-patcher (0.2) unstable; urgency=medium
 
   * Fixed problems with creation of target directories

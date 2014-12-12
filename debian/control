@@ -9,6 +9,6 @@ X-Python3-Version: >=3.2
 Package: xdelta3-dir-patcher
 Provides: bundle-diff
 Architecture: all
-Depends: ${misc:Depends}, ${python3:Depends}, xdelta3
+Depends: ${misc:Depends}, python3(>=3.2), python3(<4.0), xdelta3
 Description: Tool to create xdelta3 bundled diffs
  Tool to create xdelta3 bundled diffs of directories
