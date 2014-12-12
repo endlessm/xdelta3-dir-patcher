@@ -1,6 +1,8 @@
 import imp
 import unittest
-from filecmp import dircmp
+import tarfile
+
+from filecmp import dircmp, cmp
 from mock import Mock
 from shutil import rmtree, copytree
 from subprocess import CalledProcessError, check_output, STDOUT
@@ -34,6 +36,23 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         self.assertEquals([], diff.common_funny)
         self.assertEquals([], diff.left_only)
         self.assertEquals([], diff.right_only)
+
+    def get_content(self, filename):
+        content = None
+        with open(filename, 'rb') as file_handle:
+            content = file_handle.read()
+
+        return content
+
+    def get_file_from_archive(self, archive, name):
+        with tarfile.open(archive, 'r:gz') as archive_file:
+            named_member = archive_file.getmember(name)
+
+            named_file = archive_file.extractfile(named_member)
+            file_content = named_file.read()
+            named_file.close()
+
+        return file_content
 
     # Full-spec integration tests
     def test_apply_patch_works(self):
@@ -133,6 +152,27 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         check_output(["./%s" % self.EXECUTABLE, "apply", old_path, generated_delta_path, self.temp_dir, "--ignore-euid"] )
 
         self.compare_trees(self.temp_dir, new_path)
+
+    def test_diff_adds_the_metadata_file(self):
+        # Implicit dependency on apply integration test
+        old_path = path.join('tests', 'test_files', 'old_version1')
+        old_bundle = path.join('tests', 'test_files', 'old_version1.tgz')
+        new_path = path.join('tests', 'test_files', 'new_version1')
+        new_bundle = path.join('tests', 'test_files', 'new_version1.tgz')
+        generated_delta_path = path.join(self.temp_dir2, 'patch.xdelta')
+
+        metadata_path = path.join('tests', 'test_files', 'metadata1.txt')
+
+        check_output(["./%s" % self.EXECUTABLE,
+                      "diff",
+                      "--metadata", metadata_path,
+                      old_bundle,
+                      new_bundle,
+                      generated_delta_path] )
+
+        metadata = self.get_file_from_archive(generated_delta_path, '.info')
+
+        self.assertEquals(self.get_content(metadata_path), metadata)
 
     def test_diff_works_with_old_file_as_arguments(self):
         # Implicit dependency on apply integration test
@@ -262,6 +302,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         args.old_version = 'old'
         args.new_version = 'new'
         args.patch_bundle = 'target'
+        args.metadata = 'metadata'
         args.debug = False
 
         test_object = patcher.XDelta3DirPatcher(args)
@@ -269,7 +310,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
         test_object.run()
 
-        test_object.diff.assert_called_once_with('old', 'new', 'target')
+        test_object.diff.assert_called_once_with('old', 'new', 'target', 'metadata')
 
     def test_run_calls_apply_with_correct_arguments_if_action_is_apply(self):
         args = patcher.AttributeDict()
