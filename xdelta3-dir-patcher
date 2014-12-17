@@ -6,13 +6,13 @@ import zipfile
 
 from filecmp import dircmp
 from os import chmod, chown, geteuid, makedirs, mkdir, path, readlink, remove, symlink, sep, stat, walk
-from shutil import copymode, copystat, rmtree
+from shutil import copymode, copystat, copyfile, rmtree
 from subprocess import check_output, STDOUT
 from stat import *
 from sys import stderr
 from tempfile import mkdtemp
 
-VERSION='0.3'
+VERSION='0.4'
 
 # Allows for invoking attributes as methods/functions
 class AttributeDict(dict):
@@ -57,6 +57,7 @@ class XDelta3Impl(object):
 
 class XDelta3DirPatcher(object):
     PATCH_FOLDER = 'xdelta'
+    METADATA_FILE = '.info'
 
     def __init__(self, args, delta_impl = XDelta3Impl):
         self.args = args
@@ -137,7 +138,7 @@ class XDelta3DirPatcher(object):
             self.copy_attributes(patch_path, target_path)
 
     # TODO: Unit test me
-    def diff(self, old_dir, new_dir, patch_bundle):
+    def diff(self, old_dir, new_dir, patch_bundle, metadata = None):
         # Create a temp dir
         target_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
         print("Using %s as staging area" % target_dir)
@@ -163,6 +164,10 @@ class XDelta3DirPatcher(object):
         print("\nWriting archive...")
         with tarfile.open(patch_bundle, 'w:gz', format=tarfile.GNU_FORMAT) as patch_archive:
             patch_archive.add(delta_target_dir, arcname=self.PATCH_FOLDER)
+
+            if metadata:
+                print("Adding metadata (.info)")
+                patch_archive.add(metadata, arcname=self.METADATA_FILE)
 
         print("Cleaning up...")
         rmtree(target_dir)
@@ -261,7 +266,7 @@ class XDelta3DirPatcher(object):
                 dirs_to_clean.append(new_dir)
 
             print("Generating delta pack")
-            self.diff(old_dir, new_dir, self.args.patch_bundle)
+            self.diff(old_dir, new_dir, self.args.patch_bundle, self.args.metadata)
 
             if self.args.debug: print("Cleaning up")
             for deletion_dir in dirs_to_clean:
@@ -312,6 +317,11 @@ if __name__ == '__main__':
             action='store_true')
 
     # Arguments to create a diff
+    parser_diff.add_argument('-m', '--metadata',
+            nargs='?',
+            default=None,
+            help='Add this file (renamed to .info) as metadata to the diff')
+
     parser_diff.add_argument('old_version',
             help='Folder or tgz containing the old version of the files')
 
