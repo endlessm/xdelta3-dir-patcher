@@ -329,6 +329,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         args.new_version = 'new'
         args.patch_bundle = 'target'
         args.metadata = 'metadata'
+        args.staging_dir = 'staging_dir'
         args.debug = False
 
         test_object = patcher.XDelta3DirPatcher(args)
@@ -336,7 +337,9 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
         test_object.run()
 
-        test_object.diff.assert_called_once_with('old', 'new', 'target', 'metadata')
+        test_object.diff.assert_called_once_with('old', 'new', 'target',
+                                                 'metadata',
+                                                 'staging_dir')
 
     def test_run_calls_apply_with_correct_arguments_if_action_is_apply(self):
         args = patcher.AttributeDict()

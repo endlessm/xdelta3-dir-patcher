@@ -138,7 +138,8 @@ class XDelta3DirPatcher(object):
             self.copy_attributes(patch_path, target_path)
 
     # TODO: Unit test me
-    def diff(self, old_dir, new_dir, patch_bundle, metadata = None):
+    def diff(self, old_dir, new_dir, patch_bundle, metadata = None,
+             staging_dir = None):
         # Create a temp dir
         target_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
         print("Using %s as staging area" % target_dir)
@@ -266,7 +267,9 @@ class XDelta3DirPatcher(object):
                 dirs_to_clean.append(new_dir)
 
             print("Generating delta pack")
-            self.diff(old_dir, new_dir, self.args.patch_bundle, self.args.metadata)
+            self.diff(old_dir, new_dir, self.args.patch_bundle,
+                      self.args.metadata,
+                      self.args.staging_dir)
 
             if self.args.debug: print("Cleaning up")
             for deletion_dir in dirs_to_clean:
