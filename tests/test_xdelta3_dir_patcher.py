@@ -241,7 +241,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         output = check_output(["./%s" % self.EXECUTABLE, '--version'],
                               stderr=STDOUT,
                               universal_newlines=True)
-        self.assertEqual(output, "%s v0.4\n" % self.EXECUTABLE)
+        self.assertEqual(output, "%s v0.5\n" % self.EXECUTABLE)
 
     def test_help_is_available(self):
         self.assertIsNotNone(check_output(["./%s" % self.EXECUTABLE, '-h']))
@@ -408,6 +408,38 @@ class TestXDelta3DirPatcher(unittest.TestCase):
             pass
         else:
             fail("Should have thrown exception")
+
+    def test_check_that_the_correct_staging_dir_is_used_for_all_transient_files(self):
+        staging_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
+        target_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
+
+        old_bundle = path.join('tests', 'test_files', 'old_version1.tgz')
+        new_bundle = path.join('tests', 'test_files', 'new_version1.tgz')
+        generated_delta_path = path.join(self.temp_dir2, 'patch.xdelta')
+
+        class MockXDImplStagingTest:
+            @staticmethod
+            def diff(old_file, new_file, target_file, debug = False):
+                if old_file:
+                  self.assertTrue(old_file.startswith(staging_dir))
+
+                self.assertTrue(new_file.startswith(staging_dir))
+                self.assertTrue(target_file.startswith(staging_dir))
+
+                # passthrough since other methods depend on actual output
+                patcher.XDelta3Impl().diff(old_file, new_file, target_file, debug)
+
+        args = patcher.AttributeDict()
+        args.action = 'diff'
+        args.debug = True
+        args.metadata = None
+        args.old_version = old_bundle
+        args.new_version = new_bundle
+        args.patch_bundle = generated_delta_path
+        args.target_dir = target_dir
+        args.staging_dir = staging_dir
+
+        patcher.XDelta3DirPatcher(args, delta_impl = MockXDImplStagingTest).run()
 
     def test_expand_archive_works(self):
         archive = path.join('tests', 'test_files', 'old_version1.tgz')
