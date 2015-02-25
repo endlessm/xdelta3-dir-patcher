@@ -174,6 +174,32 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
         self.assertEquals(self.get_content(metadata_path), metadata)
 
+    def test_diff_works_with_staging_directory_set(self):
+        # Implicit dependency on apply integration test
+        old_path = path.join('tests', 'test_files', 'old_version1')
+        old_bundle = path.join('tests', 'test_files', 'old_version1.tgz')
+        new_path = path.join('tests', 'test_files', 'new_version1')
+        new_bundle = path.join('tests', 'test_files', 'new_version1.tgz')
+        generated_delta_path = path.join(self.temp_dir2, 'patch.xdelta')
+
+        staging_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
+
+        try:
+            check_output(["./%s" % self.EXECUTABLE, "diff",
+                          "--staging-dir", staging_dir,
+                          old_bundle,
+                          new_bundle,
+                          generated_delta_path] )
+        finally:
+            rmtree(staging_dir)
+
+        check_output(["./%s" % self.EXECUTABLE, "apply", old_path,
+                      generated_delta_path,
+                      self.temp_dir,
+                      "--ignore-euid"] )
+
+        self.compare_trees(self.temp_dir, new_path)
+
     def test_diff_works_with_old_file_as_arguments(self):
         # Implicit dependency on apply integration test
         old_path = path.join('tests', 'test_files', 'old_version1')

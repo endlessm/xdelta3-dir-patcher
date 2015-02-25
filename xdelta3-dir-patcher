@@ -322,6 +322,11 @@ if __name__ == '__main__':
             default=None,
             help='Add this file (renamed to .info) as metadata to the diff')
 
+    parser_diff.add_argument('-s', '--staging-dir',
+            nargs='?',
+            default=None,
+            help='Use this directory for all staging output of this program. Defaults to /tmp.')
+
     parser_diff.add_argument('old_version',
             help='Folder or tgz containing the old version of the files')
 
