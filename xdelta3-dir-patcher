@@ -5,15 +5,15 @@ import tarfile
 import zipfile
 import random
 
-from filecmp import dircmp
-from os import chmod, chown, geteuid, makedirs, mkdir, path, readlink, remove, symlink, sep, stat, walk
-from shutil import copymode, copystat, copyfile, rmtree
-from subprocess import check_output, STDOUT
 from stat import *
+from filecmp import dircmp
 from sys import stderr
 from tempfile import mkdtemp
+from subprocess import check_output, STDOUT
+from shutil import copymode, copystat, copyfile, rmtree
+from os import chmod, chown, geteuid, makedirs, mkdir, path, readlink, remove, symlink, sep, stat, walk
 
-VERSION='0.5'
+VERSION='0.6'
 
 # Allows for invoking attributes as methods/functions
 class AttributeDict(dict):
@@ -21,6 +21,17 @@ class AttributeDict(dict):
         return self[attr]
     def __setattr__(self, attr, value):
         self[attr] = value
+
+class XDelta3TarImpl(object):
+    def __init__(self, archive_path):
+        self.archive_path = archive_path
+
+    def list_files(self):
+        members = []
+        with tarfile.open(self.archive_path) as archive_object:
+            members = archive_object.getnames()
+
+        return members
 
 class XDelta3Impl(object):
     # TODO: Unit test me
@@ -246,7 +257,7 @@ class XDelta3DirPatcher(object):
 
     @staticmethod
     def get_random_string(length):
-        return ''.join([random.choice('0123456789ABCDEF') for x in range(length)])
+        return ''.join([random.choice('0123456789ABCDEF') for i in range(length)])
 
     @classmethod
     def expand_archive(clazz, archive, staging_dir = None):

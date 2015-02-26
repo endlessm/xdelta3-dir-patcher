@@ -241,7 +241,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         output = check_output(["./%s" % self.EXECUTABLE, '--version'],
                               stderr=STDOUT,
                               universal_newlines=True)
-        self.assertEqual(output, "%s v0.5\n" % self.EXECUTABLE)
+        self.assertEqual(output, "%s v0.6\n" % self.EXECUTABLE)
 
     def test_help_is_available(self):
         self.assertIsNotNone(check_output(["./%s" % self.EXECUTABLE, '-h']))
