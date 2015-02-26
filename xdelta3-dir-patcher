@@ -280,6 +280,23 @@ class XDelta3DirPatcher(object):
 
         print("Done")
 
+    def remove_deleted_items(self, target_dir, diff):
+        deleted_items = diff.right_only
+
+        for deleted_item in deleted_items:
+            deleted_item_path = path.join(target_dir, deleted_item)
+            if path.isdir(deleted_item_path):
+                rmtree(deleted_item_path)
+            else:
+                remove(deleted_item_path)
+
+            if self.args.debug: print("Deleted old path", deleted_file)
+
+        for subdir, subdir_diff in zip(diff.common_dirs, diff.subdirs.values()):
+            print(subdir)
+
+            self.remove_deleted_items(path.join(target_dir, subdir), subdir_diff)
+
     # TODO: Unit test me
     def apply(self, old_dir, patch_bundle, target_dir, root_patch_dir = None):
         # Create a temp dir
@@ -287,8 +304,9 @@ class XDelta3DirPatcher(object):
         print("Using %s as staging area" % patch_dir)
 
         print("Extracting archive...")
-        with tarfile.open(patch_bundle) as patch_archive:
-            patch_archive.extractall(patch_dir)
+        archive_object = XDelta3DirPatcher.get_archive_instance(patch_bundle)
+        for filename in archive_object.list_files():
+            archive_object.expand(filename, patch_dir)
 
         delta_patch_dir = path.join(patch_dir, self.PATCH_FOLDER)
 
@@ -303,15 +321,8 @@ class XDelta3DirPatcher(object):
             makedirs(target_dir)
 
         print("Removing deleted files")
-        deleted_item = dircmp(delta_patch_dir, target_dir).right_only
-        for deleted_item in deleted_item:
-          deleted_item_path = path.join(target_dir, deleted_item)
-          if path.isdir(deleted_item_path):
-              rmtree(deleted_item_path)
-          else:
-              remove(deleted_item_path)
-
-          if self.args.debug: print("Deleted old path", deleted_file)
+        diff = dircmp(delta_patch_dir, target_dir, ignore = None)
+        self.remove_deleted_items(target_dir, diff)
 
         print("Applying patches")
         for root, patch_dirs, patch_files in walk(delta_patch_dir):

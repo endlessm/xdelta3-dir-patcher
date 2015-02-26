@@ -49,9 +49,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         _, mismatch, error = cmpfiles(first, second, files_to_compare)
 
         self.assertEquals([], mismatch)
-
-        # Errors are ignored if folders have extra files in them
-        # self.assertEquals([], error)
+        self.assertEquals([], error)
 
     def get_content(self, filename):
         content = None
