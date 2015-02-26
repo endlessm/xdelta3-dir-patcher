@@ -209,7 +209,7 @@ class XDelta3DirPatcher(object):
         target_dir = None
         if staging_dir:
              target_dir = path.join(staging_dir,
-                                    'target_%s' % XDelta3DirPatcher.get_random_string(10))
+                                    'target_%s' % XDelta3DirPatcher.get_random_string())
         else:
             # Create a temp dir if one isn't specified
             target_dir = mkdtemp(prefix="%s_" % XDelta3DirPatcher.__name__)
@@ -310,7 +310,7 @@ class XDelta3DirPatcher(object):
             raise Exception()
 
     @staticmethod
-    def get_random_string(length):
+    def get_random_string(length = 10):
         return ''.join([random.choice('0123456789ABCDEF') for i in range(length)])
 
     @classmethod
@@ -319,7 +319,7 @@ class XDelta3DirPatcher(object):
         expansion_dir = None
         if staging_dir:
             expansion_dir = path.join(staging_dir,
-                                      'unpack_%s' % XDelta3DirPatcher.get_random_string(10))
+                                      'unpack_%s' % XDelta3DirPatcher.get_random_string())
         else:
             expansion_dir = mkdtemp(prefix="%s_" % clazz.__name__)
 
