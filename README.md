@@ -22,12 +22,16 @@ optional arguments:
 ```
 
 ### Running tests
+- Prerequisites:
+ - python3-nose
+ - python3-mock
+
 - Unittest builtin
 ```
-python -m unittest discover
+python3 -m unittest discover
 ```
 
-- Nosetests (requires nosetests module)
+- Nosetests (requires prerequisite modules/packages)
 ```
-nosetests
+nosetests3
 ```

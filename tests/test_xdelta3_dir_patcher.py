@@ -249,19 +249,19 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
     def test_debugging_is_available(self):
         output = check_output(["./%s" % self.EXECUTABLE, '--debug'])
-        self.assertNotIn("unrecognized arguments", output)
+        self.assertNotIn("unrecognized arguments", output.decode('utf-8'))
 
     def test_help_is_printed_if_no_action_command(self):
         output = check_output(["./%s" % self.EXECUTABLE])
-        self.assertIn("usage: ", output)
+        self.assertIn("usage: ", output.decode('utf-8'))
 
     def test_apply_is_allowed_as_action_command(self):
         try:
             check_output(["./%s" % self.EXECUTABLE, "apply"],
                          stderr=STDOUT)
         except CalledProcessError as e:
-            self.assertIn("usage: ", e.output)
-            self.assertNotIn("invalid choice: ", e.output)
+            self.assertIn("usage: ", e.output.decode('utf-8'))
+            self.assertNotIn("invalid choice: ", e.output.decode('utf-8'))
         else: self.fail()
 
     def test_apply_usage_is_printed_if_not_enough_args(self):
@@ -269,14 +269,15 @@ class TestXDelta3DirPatcher(unittest.TestCase):
             check_output(["./%s" % self.EXECUTABLE, "apply"],
                          stderr=STDOUT)
         except CalledProcessError as e:
-            self.assertIn("the following arguments are required: ", e.output)
+            self.assertIn("the following arguments are required: ",
+                          e.output.decode('utf-8'))
         else: self.fail()
 
     def test_apply_usage_is_not_printed_if_args_are_correct(self):
         old_path = path.join('tests', 'test_files', 'old_version1')
         delta_path = path.join('tests', 'test_files', 'patch1.xdelta.tgz')
         output = check_output(["./%s" % self.EXECUTABLE, "apply", old_path, delta_path, self.temp_dir, "--ignore-euid"] )
-        self.assertNotIn("usage: ", output)
+        self.assertNotIn("usage: ", output.decode('utf-8'))
 
     def test_apply_usage_is_not_printed_if_args_are_correct2(self):
         old_path = path.join('tests', 'test_files', 'old_version1')
@@ -286,14 +287,16 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
         delta_path = path.join('tests', 'test_files', 'patch1.xdelta.tgz')
         output = check_output(["./%s" % self.EXECUTABLE, "apply", self.temp_dir, delta_path, "--ignore-euid"] )
-        self.assertNotIn("usage: ", output)
+        self.assertNotIn("usage: ",
+                         output.decode('utf-8'))
 
     def test_diff_usage_is_printed_if_not_enough_args(self):
         try:
             check_output(["./%s" % self.EXECUTABLE, "diff"],
                          stderr=STDOUT)
         except CalledProcessError as e:
-            self.assertIn("the following arguments are required: ", e.output)
+            self.assertIn("the following arguments are required: ",
+                          e.output.decode ('utf-8'))
         else: self.fail()
 
     def test_diff_is_allowed_as_action_command(self):
@@ -301,8 +304,8 @@ class TestXDelta3DirPatcher(unittest.TestCase):
             check_output(["./%s" % self.EXECUTABLE, "diff"],
                          stderr=STDOUT)
         except CalledProcessError as e:
-            self.assertIn("usage: ", e.output)
-            self.assertNotIn("invalid choice: ", e.output)
+            self.assertIn("usage: ", e.output.decode('utf-8'))
+            self.assertNotIn("invalid choice: ", e.output.decode('utf-8'))
         else: self.fail()
 
     def test_diff_usage_is_not_printed_if_args_are_correct(self):
@@ -310,15 +313,15 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         new_path = path.join('tests', 'test_files', 'new_version1')
         delta_path = path.join(self.temp_dir, 'foo.tgz')
         output = check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_path, delta_path] )
-        self.assertNotIn("usage: ", output)
+        self.assertNotIn("usage: ", output.decode('utf-8'))
 
     def test_other_actions_are_not_allowed(self):
         try:
             check_output(["./%s" % self.EXECUTABLE, "foobar"],
                          stderr=STDOUT)
         except CalledProcessError as e:
-            self.assertIn("usage: ", e.output)
-            self.assertIn("invalid choice: ", e.output)
+            self.assertIn("usage: ", e.output.decode('utf-8'))
+            self.assertIn("invalid choice: ", e.output.decode('utf-8'))
         else: self.fail()
 
     # Unit tests
@@ -477,7 +480,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
             self.assertTrue(False)
 
         exception = error.exception
-        self.assertEqual(exception.message,
+        self.assertEqual(str(exception),
                          'Error! Archive %s bad or not supported!' % bad_archive)
 
     # ------------------- XDeltaImpl tests

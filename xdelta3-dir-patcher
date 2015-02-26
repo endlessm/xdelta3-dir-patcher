@@ -10,7 +10,7 @@ from filecmp import dircmp
 from sys import stderr
 from tempfile import mkdtemp
 from subprocess import check_output, STDOUT
-from shutil import copymode, copystat, copyfile, rmtree
+from shutil import copymode, copystat, copyfile, copy2, rmtree, copytree
 from os import chmod, chown, geteuid, listdir, makedirs, mkdir, path, readlink
 from os import remove, symlink, sep, stat, walk
 

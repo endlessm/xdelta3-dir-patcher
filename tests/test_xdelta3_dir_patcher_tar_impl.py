@@ -83,7 +83,7 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
                                                     'new folder',
                                                     'new file1.txt'))
 
-        self.assertEquals('new file content\n', actual_content)
+        self.assertEquals(b'new file content\n', actual_content)
 
     def test_impl_can_create_correctly(self):
         tar_archive = path.join(self.temp_dir, 'test_archive.tgz')
