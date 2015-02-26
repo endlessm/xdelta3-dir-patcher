@@ -335,12 +335,9 @@ class XDelta3DirPatcher(object):
 
         print("Expanding %s into %s" % (path.basename(archive), expansion_dir))
 
-        if zipfile.is_zipfile(archive):
-            with zipfile.ZipFile(archive) as version_archive:
-                version_archive.extractall(expansion_dir)
-        if tarfile.is_tarfile(archive):
-            with tarfile.open(archive) as version_archive:
-                version_archive.extractall(expansion_dir)
+        archive_object = XDelta3DirPatcher.get_archive_instance(archive)
+        for filename in archive_object.list_files():
+            archive_object.expand(filename, expansion_dir)
 
         return expansion_dir
 
