@@ -2,11 +2,11 @@ import imp
 import unittest
 import tarfile
 
-from filecmp import dircmp, cmp
+from filecmp import dircmp, cmpfiles
 from mock import Mock
-from shutil import rmtree
+from shutil import rmtree, copyfile
 from tempfile import mkdtemp
-from os import path, chmod
+from os import path, chmod, makedirs, walk
 from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH
 
 # Dashes are standard for exec scipts but not allowed for modules in Python. We
@@ -35,6 +35,19 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
         self.assertEquals([], diff.common_funny)
         self.assertEquals([], diff.left_only)
         self.assertEquals([], diff.right_only)
+
+        files_to_compare = []
+        for root, directories, files in walk(first):
+            for cmp_file in files:
+                files_to_compare.append(path.join(root, cmp_file))
+
+        # Strip target file prefixes
+        files_to_compare = [name[len(first)+1:] for name in files_to_compare]
+
+        _, mismatch, error = cmpfiles(first, second, files_to_compare)
+
+        self.assertEquals([], mismatch)
+        self.assertEquals([], error)
 
     def get_content(self, filename):
         content = None
@@ -65,8 +78,11 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
                             'updated folder/updated file.txt',
                             'updated folder/.hidden_updated_file.txt']
 
+        actual_members = test_class.list_files()
 
-        self.assertEquals(expected_members, test_class.list_files())
+        self.assertEquals(6, len(actual_members))
+        for member in expected_members:
+            self.assertIn(member, actual_members)
 
     def test_tar_impl_can_extract_members_correctly(self):
         tar_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
@@ -79,3 +95,23 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
                                                     'new file1.txt'))
 
         self.assertEquals('new file content\n', actual_content)
+
+    # Implicit dependency on extract and list_files
+    def test_tar_impl_can_create_correctly(self):
+        tar_archive = path.join(self.temp_dir, 'test_archive.tgz')
+
+        source_dir = path.join(self.TEST_FILE_PREFIX, 'new_version1')
+
+        test_class = patcher.XDelta3TarImpl(tar_archive)
+
+        # Add the files to archive
+        test_class.create(source_dir)
+
+        # Ensure that the archive was closed if it was opened
+        # so that we can reopen and test that the file was added
+        del test_class
+
+        with tarfile.open(tar_archive) as archive_object:
+            archive_object.extractall(self.temp_dir2)
+
+        self.compare_trees(source_dir, self.temp_dir2)

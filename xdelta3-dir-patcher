@@ -11,7 +11,8 @@ from sys import stderr
 from tempfile import mkdtemp
 from subprocess import check_output, STDOUT
 from shutil import copymode, copystat, copyfile, rmtree
-from os import chmod, chown, geteuid, makedirs, mkdir, path, readlink, remove, symlink, sep, stat, walk
+from os import chmod, chown, geteuid, listdir, makedirs, mkdir, path, readlink
+from os import remove, symlink, sep, stat, walk
 
 VERSION='0.6'
 
@@ -23,6 +24,8 @@ class AttributeDict(dict):
         self[attr] = value
 
 class XDelta3TarImpl(object):
+    TAR_FORMAT = 'gz'
+
     def __init__(self, archive_path):
         self.archive_path = archive_path
 
@@ -41,6 +44,15 @@ class XDelta3TarImpl(object):
                 makedirs(extraction_path)
 
             archive_object.extract(member, extraction_path)
+
+    def create(self, base_dir):
+        if path.isfile(self.archive_path):
+            raise Exception('Error! Archive already present!')
+
+        with tarfile.open(self.archive_path, 'w:%s' % self.TAR_FORMAT) as archive_object:
+            for item in listdir(base_dir):
+                full_path = path.join(base_dir, item)
+                archive_object.add(full_path, item)
 
 class XDelta3Impl(object):
     # TODO: Unit test me
