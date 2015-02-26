@@ -471,6 +471,13 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         self.assertEquals(impl_instance.__class__,
                           patcher.XDelta3ZipImpl)
 
+    def test_get_archive_instance_returns_zip_for_correct_files(self):
+        archive = path.join(self.TEST_FILE_PREFIX, 'fs_archive')
+        impl_instance = patcher.XDelta3DirPatcher.get_archive_instance(archive)
+
+        self.assertEquals(impl_instance.__class__,
+                          patcher.XDelta3FsImpl)
+
     def test_get_archive_instance_fails_if_not_supported(self):
         bad_archive = path.join(self.TEST_FILE_PREFIX, 'not_an_archive.foo')
 

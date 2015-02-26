@@ -23,6 +23,37 @@ class AttributeDict(dict):
     def __setattr__(self, attr, value):
         self[attr] = value
 
+class XDelta3FsImpl(object):
+    def __init__(self, path):
+        self.path = path
+
+    def list_files(self):
+        files = []
+        for root, dirs, filenames in walk(self.path):
+            for filename in filenames:
+                absolute_path = path.join(root, filename)
+
+                # Strip prefix so the files look relative
+                relative_path = absolute_path[len(self.path) + 1:]
+
+                files.append(relative_path)
+
+        return files
+
+    def expand(self, filename, extraction_path):
+        target_path = path.join(extraction_path, filename)
+        makedirs(path.dirname(target_path))
+
+        copy2(path.join(self.path, filename), target_path,
+              follow_symlinks=False)
+
+    def create(self, base_dir):
+        if path.isdir(self.path):
+            raise Exception('Error! Archive already present!')
+
+        copytree(base_dir, self.path,
+                     ignore_dangling_symlinks=False)
+
 class XDelta3TarImpl(object):
     TAR_FORMAT = 'gz'
 
@@ -316,6 +347,12 @@ class XDelta3DirPatcher(object):
     @staticmethod
     def get_archive_instance(archive_path):
         # TODO: Have a dynamic list of implementations to loop over
+
+        # Ordering is important here since other impl classes error out on
+        # directory paths
+        if path.isdir(archive_path):
+            return XDelta3FsImpl(archive_path)
+
         if tarfile.is_tarfile(archive_path):
             return XDelta3TarImpl(archive_path)
         if zipfile.is_zipfile(archive_path):
