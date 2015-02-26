@@ -54,6 +54,39 @@ class XDelta3TarImpl(object):
                 full_path = path.join(base_dir, item)
                 archive_object.add(full_path, item)
 
+class XDelta3ZipImpl(object):
+    def __init__(self, archive_path):
+        self.archive_path = archive_path
+
+    def list_files(self):
+        files = []
+        with zipfile.ZipFile(self.archive_path, 'r') as archive_object:
+            files = archive_object.namelist()
+
+        # Filter folder names (they end with '/')
+        files = [ name for name in files if not name.endswith(sep) ]
+
+        return files
+
+    def expand(self, filename, extraction_path):
+        with zipfile.ZipFile(self.archive_path, 'r') as archive_object:
+            if not path.isdir(extraction_path):
+                makedirs(extraction_path)
+
+            archive_object.extract(filename, extraction_path)
+
+    def create(self, base_dir):
+        if path.isfile(self.archive_path):
+            raise Exception('Error! Archive already present!')
+
+        with zipfile.ZipFile(self.archive_path, 'w') as archive_object:
+            for root, dirnames, filenames in walk(base_dir):
+                for filename in filenames:
+                    full_path = path.join(root, filename)
+                    internal_path = full_path[len(base_dir) + 1:]
+
+                    archive_object.write(full_path, internal_path)
+
 class XDelta3Impl(object):
     # TODO: Unit test me
     @staticmethod

@@ -1,6 +1,6 @@
 import imp
 import unittest
-import tarfile
+import zipfile
 
 from filecmp import dircmp, cmpfiles
 from mock import Mock
@@ -14,8 +14,8 @@ from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH
 # often.
 patcher = imp.load_source("xdelta3-dir-patcher", "xdelta3-dir-patcher")
 
-class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
-    TEST_FILE_PREFIX = path.join('tests', 'test_files', 'tar_impl')
+class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
+    TEST_FILE_PREFIX = path.join('tests', 'test_files', 'zip_impl')
 
     def setUp(self):
         self.temp_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
@@ -57,25 +57,27 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
         return content
 
     def test_can_list_members_correctly(self):
-        tar_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
-        test_class = patcher.XDelta3TarImpl(tar_archive)
+        zip_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.zip')
+        test_class = patcher.XDelta3ZipImpl(zip_archive)
 
         expected_members = ['binary_file',
                             'long_lorem.txt',
                             'new folder/new file1.txt',
+                            'new folder/new_folder/new_file2.txt',
                             'short_lorem.txt',
                             'updated folder/updated file.txt',
+                            'updated folder/updated_folder/updated_file2.txt',
                             'updated folder/.hidden_updated_file.txt']
 
         actual_members = test_class.list_files()
 
-        self.assertEquals(6, len(actual_members))
+        self.assertEquals(len(expected_members), len(actual_members))
         for member in expected_members:
             self.assertIn(member, actual_members)
 
     def test_can_extract_members_correctly(self):
-        tar_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
-        test_class = patcher.XDelta3TarImpl(tar_archive)
+        zip_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.zip')
+        test_class = patcher.XDelta3ZipImpl(zip_archive)
 
         test_class.expand('new folder/new file1.txt', self.temp_dir)
 
@@ -85,12 +87,12 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
 
         self.assertEquals('new file content\n', actual_content)
 
-    def test_impl_can_create_correctly(self):
-        tar_archive = path.join(self.temp_dir, 'test_archive.tgz')
+    def test_can_create_correctly(self):
+        zip_archive = path.join(self.temp_dir, 'test_archive.zip')
 
         source_dir = path.join(self.TEST_FILE_PREFIX, 'new_version1')
 
-        test_class = patcher.XDelta3TarImpl(tar_archive)
+        test_class = patcher.XDelta3ZipImpl(zip_archive)
 
         # Add the files to archive
         test_class.create(source_dir)
@@ -99,7 +101,7 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
         # so that we can reopen and test that the file was added
         del test_class
 
-        with tarfile.open(tar_archive) as archive_object:
+        with zipfile.ZipFile(zip_archive, 'r') as archive_object:
             archive_object.extractall(self.temp_dir2)
 
         self.compare_trees(source_dir, self.temp_dir2)
