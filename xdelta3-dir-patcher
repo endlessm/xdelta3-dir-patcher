@@ -27,11 +27,20 @@ class XDelta3TarImpl(object):
         self.archive_path = archive_path
 
     def list_files(self):
-        members = []
+        files = []
         with tarfile.open(self.archive_path) as archive_object:
-            members = archive_object.getnames()
+            files = archive_object.getnames()
 
-        return members
+        return files
+
+    def expand(self, filename, extraction_path):
+        with tarfile.open(self.archive_path) as archive_object:
+            member = archive_object.getmember(filename)
+
+            if not path.isdir(extraction_path):
+                makedirs(extraction_path)
+
+            archive_object.extract(member, extraction_path)
 
 class XDelta3Impl(object):
     # TODO: Unit test me

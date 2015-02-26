@@ -54,7 +54,7 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
         return file_content
 
 
-    def test_xdelta_tar_impl_can_list_members_correctly(self):
+    def test_tar_impl_can_list_members_correctly(self):
         tar_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
         test_class = patcher.XDelta3TarImpl(tar_archive)
 
@@ -67,3 +67,15 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
 
 
         self.assertEquals(expected_members, test_class.list_files())
+
+    def test_tar_impl_can_extract_members_correctly(self):
+        tar_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
+        test_class = patcher.XDelta3TarImpl(tar_archive)
+
+        test_class.expand('new folder/new file1.txt', self.temp_dir)
+
+        actual_content = self.get_content(path.join(self.temp_dir,
+                                                    'new folder',
+                                                    'new file1.txt'))
+
+        self.assertEquals('new file content\n', actual_content)
