@@ -2,7 +2,7 @@ import imp
 import unittest
 import tarfile
 
-from filecmp import dircmp, cmp
+from filecmp import dircmp, cmpfiles
 from mock import Mock
 from shutil import rmtree, copytree
 from subprocess import CalledProcessError, check_output, STDOUT
@@ -37,6 +37,21 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         self.assertEquals([], diff.common_funny)
         self.assertEquals([], diff.left_only)
         self.assertEquals([], diff.right_only)
+
+        files_to_compare = []
+        for root, directories, files in walk(first):
+            for cmp_file in files:
+                files_to_compare.append(path.join(root, cmp_file))
+
+        # Strip target file prefixes
+        files_to_compare = [name[len(first)+1:] for name in files_to_compare]
+
+        _, mismatch, error = cmpfiles(first, second, files_to_compare)
+
+        self.assertEquals([], mismatch)
+
+        # Errors are ignored if folders have extra files in them
+        # self.assertEquals([], error)
 
     def get_content(self, filename):
         content = None
