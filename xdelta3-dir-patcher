@@ -313,6 +313,16 @@ class XDelta3DirPatcher(object):
     def get_random_string(length = 10):
         return ''.join([random.choice('0123456789ABCDEF') for i in range(length)])
 
+    @staticmethod
+    def get_archive_instance(archive_path):
+        # TODO: Have a dynamic list of implementations to loop over
+        if tarfile.is_tarfile(archive_path):
+            return XDelta3TarImpl(archive_path)
+        if zipfile.is_zipfile(archive_path):
+            return XDelta3ZipImpl(archive_path)
+
+        raise RuntimeError('Error! Archive %s bad or not supported!' % archive_path)
+
     @classmethod
     def expand_archive(clazz, archive, staging_dir = None):
         # Figure out where to expand the archive

@@ -452,6 +452,34 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         # Clean up
         rmtree(result_dir)
 
+    # ------------------- Test for archive implementation picking
+    def test_get_archive_instance_returns_tar_for_correct_files(self):
+        tar_archive = path.join('tests', 'test_files', 'old_version1.tgz')
+        impl_instance = patcher.XDelta3DirPatcher.get_archive_instance(tar_archive)
+
+        self.assertEquals(impl_instance.__class__,
+                          patcher.XDelta3TarImpl)
+
+    def test_get_archive_instance_returns_zip_for_correct_files(self):
+        zip_archive = path.join('tests', 'test_files', 'old_version1.zip')
+        impl_instance = patcher.XDelta3DirPatcher.get_archive_instance(zip_archive)
+
+        self.assertEquals(impl_instance.__class__,
+                          patcher.XDelta3ZipImpl)
+
+    def test_get_archive_instance_fails_if_not_supported(self):
+        bad_archive = path.join('tests', 'test_files', 'not_an_archive.foo')
+
+        with self.assertRaises(RuntimeError) as error:
+            patcher.XDelta3DirPatcher.get_archive_instance(bad_archive)
+
+            # Sanity check
+            self.assertTrue(False)
+
+        exception = error.exception
+        self.assertEqual(exception.message,
+                         'Error! Archive %s bad or not supported!' % bad_archive)
+
     # ------------------- XDeltaImpl tests
     def test_xdelta_impl_run_command_invokes_the_command(self):
         # TODO: implement the test
