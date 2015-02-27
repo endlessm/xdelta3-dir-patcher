@@ -23,6 +23,9 @@ optional arguments:
 
 ```
 
+### License
+MIT
+
 ### Running tests
 - Prerequisites:
  - python3-nose
@@ -37,3 +40,5 @@ python3 -m unittest discover
 ```
 nosetests3
 ```
+
+© 2014-2015 Endless Mobile
