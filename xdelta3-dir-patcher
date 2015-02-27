@@ -174,6 +174,21 @@ class XDelta3DirPatcher(object):
 
         chown(dest_file,uid,gid)
 
+    @staticmethod
+    def _get_temp_dir(staging_dir, prefix):
+        temp_dir = None
+        if staging_dir:
+            folder_name = '%s_%s' % (prefix, XDelta3DirPatcher.get_random_string())
+            temp_dir = path.join(staging_dir, folder_name)
+        else:
+            # Create a temp dir if one isn't specified
+            temp_dir = mkdtemp(prefix="%s_" % XDelta3DirPatcher.__name__)
+
+        if not path.isdir(temp_dir):
+            mkdir(temp_dir)
+
+        return temp_dir
+
     def _find_file_delta(self, rel_path, new_file, old_root, new_root, target_root):
         print("Processing %s" % new_file)
 
@@ -237,13 +252,7 @@ class XDelta3DirPatcher(object):
     # TODO: Unit test me
     def diff(self, old_dir, new_dir, patch_bundle, metadata = None,
              staging_dir = None):
-        target_dir = None
-        if staging_dir:
-             target_dir = path.join(staging_dir,
-                                    'target_%s' % XDelta3DirPatcher.get_random_string())
-        else:
-            # Create a temp dir if one isn't specified
-            target_dir = mkdtemp(prefix="%s_" % XDelta3DirPatcher.__name__)
+        target_dir = self._get_temp_dir(staging_dir, 'target')
 
         print("Using %s as staging area" % target_dir)
 
@@ -300,7 +309,8 @@ class XDelta3DirPatcher(object):
     # TODO: Unit test me
     def apply(self, old_dir, patch_bundle, target_dir, root_patch_dir = None):
         # Create a temp dir
-        patch_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
+        # TODO: Pass on the staging dir to apply
+        patch_dir = self._get_temp_dir(None, 'delta_src')
         print("Using %s as staging area" % patch_dir)
 
         print("Extracting archive...")
@@ -374,13 +384,7 @@ class XDelta3DirPatcher(object):
     @classmethod
     def expand_archive(clazz, archive, staging_dir = None):
         # Figure out where to expand the archive
-        expansion_dir = None
-        if staging_dir:
-            expansion_dir = path.join(staging_dir,
-                                      'unpack_%s' % XDelta3DirPatcher.get_random_string())
-        else:
-            expansion_dir = mkdtemp(prefix="%s_" % clazz.__name__)
-
+        expansion_dir = XDelta3DirPatcher._get_temp_dir(staging_dir, 'archive')
         print("Expanding %s into %s" % (path.basename(archive), expansion_dir))
 
         archive_object = XDelta3DirPatcher.get_archive_instance(archive)
