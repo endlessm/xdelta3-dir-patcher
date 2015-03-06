@@ -23,6 +23,8 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
         self.temp_dir2 = mkdtemp(prefix="%s_" % self.__class__.__name__)
         chmod(self.temp_dir2, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
 
+        self.test_class = patcher.XDelta3TarImpl
+
     def tearDown(self):
         rmtree(self.temp_dir)
         rmtree(self.temp_dir2)
@@ -58,7 +60,7 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
 
     def test_can_list_members_correctly(self):
         tar_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
-        test_class = patcher.XDelta3TarImpl(tar_archive)
+        test_object = self.test_class(tar_archive)
 
         expected_members = ['binary_file',
                             'long_lorem.txt',
@@ -67,7 +69,7 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
                             'updated folder/updated file.txt',
                             'updated folder/.hidden_updated_file.txt']
 
-        actual_members = test_class.list_files()
+        actual_members = test_object.list_files()
 
         self.assertEquals(6, len(actual_members))
         for member in expected_members:
@@ -75,9 +77,9 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
 
     def test_can_extract_members_correctly(self):
         tar_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
-        test_class = patcher.XDelta3TarImpl(tar_archive)
+        test_object = self.test_class(tar_archive)
 
-        test_class.expand('new folder/new file1.txt', self.temp_dir)
+        test_object.expand('new folder/new file1.txt', self.temp_dir)
 
         actual_content = self.get_content(path.join(self.temp_dir,
                                                     'new folder',
@@ -85,19 +87,30 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
 
         self.assertEquals(b'new file content\n', actual_content)
 
+    def test_can_extract_members_correctly_in_already_created_dir(self):
+        archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
+        test_object = self.test_class(archive)
+
+        test_object.expand('new folder/new file1.txt', self.temp_dir)
+
+        try:
+            test_object.expand('new folder/new file1.txt', self.temp_dir)
+        except:
+            self.fail("Should not have thrown an error on expanding same item")
+
     def test_impl_can_create_correctly(self):
         tar_archive = path.join(self.temp_dir, 'test_archive.tgz')
 
         source_dir = path.join(self.TEST_FILE_PREFIX, 'new_version1')
 
-        test_class = patcher.XDelta3TarImpl(tar_archive)
+        test_object = self.test_class(tar_archive)
 
         # Add the files to archive
-        test_class.create(source_dir)
+        test_object.create(source_dir)
 
         # Ensure that the archive was closed if it was opened
         # so that we can reopen and test that the file was added
-        del test_class
+        del test_object
 
         with tarfile.open(tar_archive) as archive_object:
             archive_object.extractall(self.temp_dir2)

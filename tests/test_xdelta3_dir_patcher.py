@@ -434,7 +434,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         new_bundle = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
         generated_delta_path = path.join(self.temp_dir2, 'patch.xdelta')
 
-        class MockXDImplStagingTest:
+        class MockXDImplStagingTest():
             @staticmethod
             def diff(old_file, new_file, target_file, debug = False):
                 if old_file:

@@ -23,6 +23,8 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
         self.temp_dir2 = mkdtemp(prefix="%s_" % self.__class__.__name__)
         chmod(self.temp_dir2, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
 
+        self.test_class = patcher.XDelta3ZipImpl
+
     def tearDown(self):
         rmtree(self.temp_dir)
         rmtree(self.temp_dir2)
@@ -58,7 +60,7 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
 
     def test_can_list_members_correctly(self):
         zip_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.zip')
-        test_class = patcher.XDelta3ZipImpl(zip_archive)
+        test_object = self.test_class(zip_archive)
 
         expected_members = ['binary_file',
                             'long_lorem.txt',
@@ -69,7 +71,7 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
                             'updated folder/updated_folder/updated_file2.txt',
                             'updated folder/.hidden_updated_file.txt']
 
-        actual_members = test_class.list_files()
+        actual_members = test_object.list_files()
 
         self.assertEquals(len(expected_members), len(actual_members))
         for member in expected_members:
@@ -77,9 +79,9 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
 
     def test_can_extract_members_correctly(self):
         zip_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.zip')
-        test_class = patcher.XDelta3ZipImpl(zip_archive)
+        test_object = self.test_class(zip_archive)
 
-        test_class.expand('new folder/new file1.txt', self.temp_dir)
+        test_object.expand('new folder/new file1.txt', self.temp_dir)
 
         actual_content = self.get_content(path.join(self.temp_dir,
                                                     'new folder',
@@ -87,19 +89,30 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
 
         self.assertEquals(b'new file content\n', actual_content)
 
+    def test_can_extract_members_correctly_in_already_created_dir(self):
+        archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.zip')
+        test_object = self.test_class(archive)
+
+        test_object.expand('new folder/new file1.txt', self.temp_dir)
+
+        try:
+            test_object.expand('new folder/new file1.txt', self.temp_dir)
+        except:
+            self.fail("Should not have thrown an error on expanding same item")
+
     def test_can_create_correctly(self):
         zip_archive = path.join(self.temp_dir, 'test_archive.zip')
 
         source_dir = path.join(self.TEST_FILE_PREFIX, 'new_version1')
 
-        test_class = patcher.XDelta3ZipImpl(zip_archive)
+        test_object = self.test_class(zip_archive)
 
         # Add the files to archive
-        test_class.create(source_dir)
+        test_object.create(source_dir)
 
         # Ensure that the archive was closed if it was opened
         # so that we can reopen and test that the file was added
-        del test_class
+        del test_object
 
         with zipfile.ZipFile(zip_archive, 'r') as archive_object:
             archive_object.extractall(self.temp_dir2)

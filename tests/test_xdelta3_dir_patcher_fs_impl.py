@@ -65,10 +65,14 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
 
         expected_members = ['binary_file',
                             'long_lorem.txt',
+                            'new folder/',
                             'new folder/new file1.txt',
+                            'new folder/new_folder/',
                             'new folder/new_folder/new_file2.txt',
                             'short_lorem.txt',
+                            'updated folder/',
                             'updated folder/updated file.txt',
+                            'updated folder/updated_folder/',
                             'updated folder/updated_folder/updated_file2.txt',
                             'updated folder/.hidden_updated_file.txt']
 
@@ -78,7 +82,7 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
         for member in expected_members:
             self.assertIn(member, actual_members)
 
-    def test_can_extract_members_correctly(self):
+    def test_can_extract_files_correctly(self):
         archive = path.join(self.TEST_FILE_PREFIX, 'new_version1')
         test_object = self.test_class(archive)
 
@@ -89,6 +93,27 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
                                                     'new file1.txt'))
 
         self.assertEquals(b'new file content\n', actual_content)
+
+    def test_can_extract_folders_correctly(self):
+        archive = path.join(self.TEST_FILE_PREFIX, 'new_version1')
+        test_object = self.test_class(archive)
+
+        folder_name = 'new folder/'
+
+        test_object.expand(folder_name, self.temp_dir)
+
+        self.assertTrue(path.isdir(path.join(self.temp_dir, folder_name)))
+
+    def test_can_extract_members_correctly_in_already_created_dir(self):
+        archive = path.join(self.TEST_FILE_PREFIX, 'new_version1')
+        test_object = self.test_class(archive)
+
+        test_object.expand('new folder/new file1.txt', self.temp_dir)
+
+        try:
+            test_object.expand('new folder/new file1.txt', self.temp_dir)
+        except:
+            self.fail("Should not have thrown an error on expanding same item")
 
     def test_can_create_correctly(self):
         archive = path.join(self.temp_dir , 'test_archive')

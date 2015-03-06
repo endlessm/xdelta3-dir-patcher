@@ -23,6 +23,7 @@ class AttributeDict(dict):
     def __setattr__(self, attr, value):
         self[attr] = value
 
+# ---------------------------- ARCHIVE ADAPTERS ----------------------------
 class XDelta3FsImpl(object):
     def __init__(self, path):
         self.path = path
@@ -34,7 +35,15 @@ class XDelta3FsImpl(object):
                 absolute_path = path.join(root, filename)
 
                 # Strip prefix so the files look relative
-                relative_path = absolute_path[len(self.path) + 1:]
+                relative_path = path.relpath(absolute_path, self.path)
+
+                files.append(relative_path)
+
+            for directory in dirs:
+                absolute_path = path.join(root, directory)
+
+                # Strip prefix so the files look relative
+                relative_path = path.relpath(absolute_path, self.path) + path.sep
 
                 files.append(relative_path)
 
@@ -42,10 +51,18 @@ class XDelta3FsImpl(object):
 
     def expand(self, filename, extraction_path):
         target_path = path.join(extraction_path, filename)
-        makedirs(path.dirname(target_path))
 
-        copy2(path.join(self.path, filename), target_path,
-              follow_symlinks=False)
+        if not target_path.endswith(path.sep):
+            dir_path = path.dirname(target_path)
+            if not path.isdir(dir_path):
+                makedirs(dir_path)
+
+            copy2(path.join(self.path, filename), target_path,
+                  follow_symlinks=False)
+        else:
+            if not path.isdir(target_path):
+                makedirs(target_path)
+
 
     def create(self, base_dir):
         if path.isdir(self.path):
@@ -100,10 +117,10 @@ class XDelta3ZipImpl(object):
         return files
 
     def expand(self, filename, extraction_path):
-        with zipfile.ZipFile(self.archive_path, 'r') as archive_object:
-            if not path.isdir(extraction_path):
-                makedirs(extraction_path)
+        if not path.isdir(extraction_path):
+            makedirs(extraction_path)
 
+        with zipfile.ZipFile(self.archive_path, 'r') as archive_object:
             archive_object.extract(filename, extraction_path)
 
     def create(self, base_dir):
@@ -118,6 +135,7 @@ class XDelta3ZipImpl(object):
 
                     archive_object.write(full_path, internal_path)
 
+# ---------------------------- XDELTA3 ADAPTER ----------------------------
 class XDelta3Impl(object):
     # TODO: Unit test me
     @staticmethod
@@ -152,6 +170,7 @@ class XDelta3Impl(object):
         if debug: print("Applying xdelta: %s" % command)
         XDelta3Impl.run_command(command)
 
+# ---------------------------- MAIN CLASS ----------------------------
 class XDelta3DirPatcher(object):
     PATCH_FOLDER = 'xdelta'
     METADATA_FILE = '.info'
@@ -189,12 +208,17 @@ class XDelta3DirPatcher(object):
 
         return temp_dir
 
-    def _find_file_delta(self, rel_path, new_file, old_root, new_root, target_root):
-        print("Processing %s" % new_file)
+    def _find_file_delta(self, filename, old_root, new_root, target_root):
+        print("Processing %s" % filename)
 
-        old_path = path.join(old_root, rel_path, new_file)
-        new_path = path.join(new_root, rel_path, new_file)
-        target_path = path.join(target_root, rel_path, new_file)
+        old_path = path.join(old_root, filename)
+        new_path = path.join(new_root, filename)
+        target_path = path.join(target_root, filename)
+
+        target_dir = path.dirname(target_path)
+        if not path.isdir(target_dir):
+            # FIXME: Copy all permissions for these
+            makedirs(target_dir)
 
         if self.args.debug: print([old_path, new_path, target_path])
 
@@ -204,7 +228,8 @@ class XDelta3DirPatcher(object):
             if self.args.debug: print("symlink: ", [target_path, new_dst])
 
         elif path.isdir(new_path):
-            mkdir(target_path)
+            if not path.exists(target_path):
+                mkdir(target_path)
             self.copy_attributes(new_path, target_path)
 
         else:
@@ -257,24 +282,27 @@ class XDelta3DirPatcher(object):
         print("Using %s as staging area" % target_dir)
 
         delta_target_dir = path.join(target_dir, self.PATCH_FOLDER)
-
         if not path.isdir(delta_target_dir):
-            makedirs(delta_target_dir)
+            mkdir(delta_target_dir)
 
-        for root, new_dirs, new_files in walk(new_dir):
-            print("Entering directory", root)
+        old_archive_obj = self.get_archive_instance(old_dir)
+        new_archive_obj = self.get_archive_instance(new_dir)
 
-            rel_path = path.relpath(root, new_dir)
+        old_staging_dir = self._get_temp_dir(staging_dir, 'old_src')
+        new_staging_dir = self._get_temp_dir(staging_dir, 'new_src')
+        for filename in new_archive_obj.list_files():
+            new_archive_obj.expand(filename, new_staging_dir)
 
-            if self.args.debug: print("- Subdirs:", new_dirs)
-            if self.args.debug: print("- Files:", new_files)
+            if filename in old_archive_obj.list_files():
+                old_archive_obj.expand(filename, old_staging_dir)
 
-            for new_dir1 in new_dirs:
-                self._find_file_delta(rel_path, new_dir1, old_dir, new_dir, delta_target_dir)
-            for new_file in new_files:
-                self._find_file_delta(rel_path, new_file, old_dir, new_dir, delta_target_dir)
+            self._find_file_delta(filename, old_staging_dir, new_staging_dir, delta_target_dir)
 
-            print("Leaving directory", root)
+        # FIXME: Figure out how to handle dirs (premissions/uids/etc)
+
+        # TODO: Remove each individual file as they're processed
+        rmtree(old_staging_dir)
+        rmtree(new_staging_dir)
 
         print("\nWriting archive...")
         with tarfile.open(patch_bundle, 'w:gz', format=tarfile.GNU_FORMAT) as patch_archive:
@@ -285,7 +313,7 @@ class XDelta3DirPatcher(object):
                 patch_archive.add(metadata, arcname=self.METADATA_FILE)
 
         print("Cleaning up...")
-        rmtree(target_dir)
+        rmtree(staging_dir)
 
         print("Done")
 
@@ -397,30 +425,14 @@ class XDelta3DirPatcher(object):
         print("Running directory patcher...")
 
         if self.args.action == 'diff':
-            dirs_to_clean = []
-
             if self.args.debug: print("Parsing arguments")
-            old_dir = self.args.old_version
-            if path.isfile(self.args.old_version):
-                old_dir = self.expand_archive(self.args.old_version,
-                                              self.args.staging_dir)
-                dirs_to_clean.append(old_dir)
-
-            new_dir = self.args.new_version
-            if path.isfile(self.args.new_version):
-                new_dir = self.expand_archive(self.args.new_version,
-                                              self.args.staging_dir)
-
-                dirs_to_clean.append(new_dir)
 
             print("Generating delta pack")
-            self.diff(old_dir, new_dir, self.args.patch_bundle,
+            self.diff(self.args.old_version,
+                      self.args.new_version,
+                      self.args.patch_bundle,
                       self.args.metadata,
                       self.args.staging_dir)
-
-            if self.args.debug: print("Cleaning up")
-            for deletion_dir in dirs_to_clean:
-                rmtree(deletion_dir)
         else:
             # If we're not the root user, bail since we can't ensure that the
             # user and group permissions are retained
