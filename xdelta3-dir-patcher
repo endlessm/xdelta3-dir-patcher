@@ -69,7 +69,7 @@ class XDelta3FsImpl(object):
             raise Exception('Error! Archive already present!')
 
         copytree(base_dir, self.path,
-                     ignore_dangling_symlinks=False)
+                 ignore_dangling_symlinks=False)
 
 class XDelta3TarImpl(object):
     TAR_FORMAT = 'gz'
@@ -313,7 +313,7 @@ class XDelta3DirPatcher(object):
                 patch_archive.add(metadata, arcname=self.METADATA_FILE)
 
         print("Cleaning up...")
-        rmtree(staging_dir)
+        rmtree(target_dir)
 
         print("Done")
 
