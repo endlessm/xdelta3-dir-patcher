@@ -29,6 +29,13 @@ class XDelta3FsImpl(object):
         self.path = path
         self.items = None
 
+    # Placeholders to allow us to use 'with` keywords on this implementation
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        pass
+
     def list_files(self):
         if self.items:
             return self.items

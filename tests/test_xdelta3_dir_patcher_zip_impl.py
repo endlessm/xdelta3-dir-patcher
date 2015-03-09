@@ -128,7 +128,7 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
             except:
                 self.fail("Should not have thrown an error on expanding same item")
 
-    def test_impl_can_create_correctly(self):
+    def test_can_create_correctly(self):
         archive = path.join(self.temp_dir, 'test_archive.zip')
 
         source_dir = path.join(self.TEST_FILE_PREFIX, 'new_version1')
