@@ -115,17 +115,17 @@ class XDelta3TarImpl(object):
         if self.items:
             return self.items
 
-        print('Tar: Gathering filelist')
         items = []
-        with tarfile.open(self.archive_path) as archive_object:
-            members = archive_object.getmembers()
 
-            # Lookup all member objects
-            for member in members:
-                # For directories, add a separator to the end
-                suffix = path.sep if member.isdir() else ''
+        print('Tar: Gathering filelist')
+        members = self.archive_object.getmembers()
 
-                items.append('%s%s' % (member.name, suffix))
+        # Lookup all member objects
+        for member in members:
+            # For directories, add a separator to the end
+            suffix = path.sep if member.isdir() else ''
+
+            items.append('%s%s' % (member.name, suffix))
 
         # Append any directories that weren't part of the archive
         for item in items:
