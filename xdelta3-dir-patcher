@@ -159,21 +159,38 @@ class XDelta3TarImpl(object):
             self.archive_object.add(full_path, item)
 
 class XDelta3ZipImpl(object):
-    def __init__(self, archive_path):
+    def __init__(self, archive_path, for_writing = False):
         self.archive_path = archive_path
         self.items = None
+        self.for_writing = for_writing
+
+    def __enter__(self):
+        flags = 'r'
+
+        if self.for_writing:
+            if path.isfile(self.archive_path):
+                raise Exception('Error! Archive already present!')
+
+            flags = 'w'
+
+        self.archive_object = zipfile.ZipFile(self.archive_path, flags)
+
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.archive_object.close()
 
     def list_files(self):
         if self.items:
             return self.items
 
         print('Zip: Gathering filelist')
-        items = []
-        with zipfile.ZipFile(self.archive_path, 'r') as archive_object:
-            items = archive_object.namelist()
-
+        items = self.archive_object.namelist()
         print('Zip: Gathering completed')
 
+        # Intentional separation of variables so that we don't assign
+        # some garbage value to self.items as well as print out the debug
+        # messages
         self.items = items
 
         return self.items
@@ -182,20 +199,15 @@ class XDelta3ZipImpl(object):
         if not path.isdir(extraction_path):
             makedirs(extraction_path)
 
-        with zipfile.ZipFile(self.archive_path, 'r') as archive_object:
-            archive_object.extract(filename, extraction_path)
+        self.archive_object.extract(filename, extraction_path)
 
     def create(self, base_dir):
-        if path.isfile(self.archive_path):
-            raise Exception('Error! Archive already present!')
+        for root, dirnames, filenames in walk(base_dir):
+            for filename in filenames:
+                full_path = path.join(root, filename)
+                internal_path = full_path[len(base_dir) + 1:]
 
-        with zipfile.ZipFile(self.archive_path, 'w') as archive_object:
-            for root, dirnames, filenames in walk(base_dir):
-                for filename in filenames:
-                    full_path = path.join(root, filename)
-                    internal_path = full_path[len(base_dir) + 1:]
-
-                    archive_object.write(full_path, internal_path)
+                self.archive_object.write(full_path, internal_path)
 
 # ---------------------------- XDELTA3 ADAPTER ----------------------------
 class XDelta3Impl(object):
