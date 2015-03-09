@@ -5,7 +5,7 @@ import unittest
 
 from filecmp import dircmp, cmpfiles
 from mock import Mock
-from shutil import rmtree, copyfile
+from shutil import rmtree, copyfile, copytree
 from tempfile import mkdtemp
 from os import path, chmod, makedirs, walk
 from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH
@@ -59,28 +59,56 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
 
         return content
 
+    def expected_new_version1_members(self):
+        return ['binary_file',
+                'long_lorem.txt',
+                'new folder/',
+                'new folder/new file1.txt',
+                'new folder/new_folder/',
+                'new folder/new_folder/new_file2.txt',
+                'short_lorem.txt',
+                'updated folder/',
+                'updated folder/updated file.txt',
+                'updated folder/updated_folder/',
+                'updated folder/updated_folder/updated_file2.txt',
+                'updated folder/.hidden_updated_file.txt']
+
+
     def test_can_list_members_correctly(self):
         archive = path.join(self.TEST_FILE_PREFIX, 'new_version1')
         test_object = self.test_class(archive)
 
-        expected_members = ['binary_file',
-                            'long_lorem.txt',
-                            'new folder/',
-                            'new folder/new file1.txt',
-                            'new folder/new_folder/',
-                            'new folder/new_folder/new_file2.txt',
-                            'short_lorem.txt',
-                            'updated folder/',
-                            'updated folder/updated file.txt',
-                            'updated folder/updated_folder/',
-                            'updated folder/updated_folder/updated_file2.txt',
-                            'updated folder/.hidden_updated_file.txt']
-
         actual_members = test_object.list_files()
 
-        self.assertEquals(len(expected_members), len(actual_members))
-        for member in expected_members:
+        self.assertEquals(len(self.expected_new_version1_members()),
+                          len(actual_members))
+
+        for member in self.expected_new_version1_members():
             self.assertIn(member, actual_members)
+
+    def test_list_members_is_cached(self):
+        orig_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1')
+        archive = path.join(self.temp_dir, 'new_version1')
+        copytree(orig_archive, archive)
+
+        test_object = self.test_class(archive)
+
+        # force a load of the index
+        initial_members = test_object.list_files()
+        self.assertEquals(len(self.expected_new_version1_members()),
+                          len(initial_members))
+        # remove the archive
+        rmtree(archive)
+
+        # test invocation
+        actual_members = test_object.list_files()
+
+        self.assertEquals(len(self.expected_new_version1_members()),
+                          len(actual_members))
+
+        for member in self.expected_new_version1_members():
+            self.assertIn(member, actual_members)
+
 
     def test_can_extract_files_correctly(self):
         archive = path.join(self.TEST_FILE_PREFIX, 'new_version1')

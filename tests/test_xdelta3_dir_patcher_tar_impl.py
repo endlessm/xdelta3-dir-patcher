@@ -6,7 +6,7 @@ from filecmp import dircmp, cmpfiles
 from mock import Mock
 from shutil import rmtree, copyfile
 from tempfile import mkdtemp
-from os import path, chmod, makedirs, walk
+from os import path, chmod, makedirs, walk, remove
 from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH
 
 # Dashes are standard for exec scipts but not allowed for modules in Python. We
@@ -58,28 +58,54 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
 
         return content
 
-    def test_can_list_members_correctly(self):
-        tar_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
-        test_object = self.test_class(tar_archive)
+    def expected_new_version1_members(self):
+        return ['binary_file',
+                'long_lorem.txt',
+                'new folder/',
+                'new folder/new file1.txt',
+                'short_lorem.txt',
+                'updated folder/',
+                'updated folder/updated file.txt',
+                'updated folder/.hidden_updated_file.txt']
 
-        expected_members = ['binary_file',
-                            'long_lorem.txt',
-                            'new folder/',
-                            'new folder/new file1.txt',
-                            'short_lorem.txt',
-                            'updated folder/updated file.txt',
-                            'updated folder/',
-                            'updated folder/.hidden_updated_file.txt']
+    def test_can_list_members_correctly(self):
+        archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
+        test_object = self.test_class(archive)
 
         actual_members = test_object.list_files()
 
-        self.assertEquals(len(expected_members), len(actual_members))
-        for member in expected_members:
+        self.assertEquals(len(self.expected_new_version1_members()),
+                          len(actual_members))
+
+        for member in self.expected_new_version1_members():
+            self.assertIn(member, actual_members)
+
+    def test_list_members_is_cached(self):
+        orig_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
+        archive = path.join(self.temp_dir, 'new_version1.tgz')
+        copyfile(orig_archive, archive)
+
+        test_object = self.test_class(archive)
+
+        # Force a load of the index
+        initial_members = test_object.list_files()
+        self.assertEquals(len(self.expected_new_version1_members()),
+                          len(initial_members))
+
+        # Remove the archive
+        remove(archive)
+
+        # Test invocation
+        actual_members = test_object.list_files()
+
+        self.assertEquals(len(self.expected_new_version1_members()),
+                          len(actual_members))
+        for member in self.expected_new_version1_members():
             self.assertIn(member, actual_members)
 
     def test_can_extract_members_correctly(self):
-        tar_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
-        test_object = self.test_class(tar_archive)
+        archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
+        test_object = self.test_class(archive)
 
         test_object.expand('new folder/new file1.txt', self.temp_dir)
 
@@ -101,11 +127,11 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
             self.fail("Should not have thrown an error on expanding same item")
 
     def test_impl_can_create_correctly(self):
-        tar_archive = path.join(self.temp_dir, 'test_archive.tgz')
+        archive = path.join(self.temp_dir, 'test_archive.tgz')
 
         source_dir = path.join(self.TEST_FILE_PREFIX, 'new_version1')
 
-        test_object = self.test_class(tar_archive)
+        test_object = self.test_class(archive)
 
         # Add the files to archive
         test_object.create(source_dir)
@@ -114,7 +140,7 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
         # so that we can reopen and test that the file was added
         del test_object
 
-        with tarfile.open(tar_archive) as archive_object:
+        with tarfile.open(archive) as archive_object:
             archive_object.extractall(self.temp_dir2)
 
         self.compare_trees(source_dir, self.temp_dir2)

@@ -27,10 +27,14 @@ class AttributeDict(dict):
 class XDelta3FsImpl(object):
     def __init__(self, path):
         self.path = path
+        self.items = None
 
     def list_files(self):
+        if self.items:
+            return self.items
+
         print('FS: Gathering filelist')
-        files = []
+        items = []
         for root, dirs, filenames in walk(self.path):
             for directory in dirs:
                 absolute_path = path.join(root, directory)
@@ -38,7 +42,7 @@ class XDelta3FsImpl(object):
                 # Strip prefix so the files look relative
                 relative_path = path.relpath(absolute_path, self.path) + path.sep
 
-                files.append(relative_path)
+                items.append(relative_path)
 
             for filename in filenames:
                 absolute_path = path.join(root, filename)
@@ -46,10 +50,13 @@ class XDelta3FsImpl(object):
                 # Strip prefix so the files look relative
                 relative_path = path.relpath(absolute_path, self.path)
 
-                files.append(relative_path)
+                items.append(relative_path)
 
         print('FS: Gathering completed')
-        return files
+
+        self.items = items
+
+        return self.items
 
     def expand(self, filename, extraction_path):
         target_path = path.join(extraction_path, filename)
@@ -78,8 +85,12 @@ class XDelta3TarImpl(object):
 
     def __init__(self, archive_path):
         self.archive_path = archive_path
+        self.items = None
 
     def list_files(self):
+        if self.items:
+            return self.items
+
         print('Tar: Gathering filelist')
         items = []
         with tarfile.open(self.archive_path) as archive_object:
@@ -100,7 +111,10 @@ class XDelta3TarImpl(object):
                 items.append(dir_name)
 
         print('Tar: Gathering completed')
-        return items
+
+        self.items = items
+
+        return self.items
 
     def expand(self, filename, extraction_path):
         with tarfile.open(self.archive_path) as archive_object:
@@ -135,15 +149,22 @@ class XDelta3TarImpl(object):
 class XDelta3ZipImpl(object):
     def __init__(self, archive_path):
         self.archive_path = archive_path
+        self.items = None
 
     def list_files(self):
+        if self.items:
+            return self.items
+
         print('Zip: Gathering filelist')
-        files = []
+        items = []
         with zipfile.ZipFile(self.archive_path, 'r') as archive_object:
-            files = archive_object.namelist()
+            items = archive_object.namelist()
 
         print('Zip: Gathering completed')
-        return files
+
+        self.items = items
+
+        return self.items
 
     def expand(self, filename, extraction_path):
         if not path.isdir(extraction_path):
