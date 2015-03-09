@@ -366,16 +366,17 @@ class XDelta3DirPatcher(object):
         if not path.isdir(delta_target_dir):
             mkdir(delta_target_dir)
 
-        old_archive_obj = self.get_archive_instance(old_dir)
-        new_archive_obj = self.get_archive_instance(new_dir)
+        old_archive_class = self.get_archive_class(old_dir)
+        new_archive_class = self.get_archive_class(new_dir)
 
-        old_staging_dir = self._get_temp_dir(staging_dir, 'old_src')
-        new_staging_dir = self._get_temp_dir(staging_dir, 'new_src')
-        for filename in new_archive_obj.list_files():
-            new_archive_obj.expand(filename, new_staging_dir)
+        with old_archive_class(old_dir) as old_archive_obj, \
+             new_archive_class(new_dir) as new_archive_obj:
+            old_staging_dir = self._get_temp_dir(staging_dir, 'old_src')
+            new_staging_dir = self._get_temp_dir(staging_dir, 'new_src')
 
-            if filename in old_archive_obj.list_files():
-                old_archive_obj.expand(filename, old_staging_dir)
+            for filename in new_archive_obj.list_files():
+                if filename.endswith('/'):
+                    continue
 
             self._find_file_delta(filename, old_staging_dir, new_staging_dir, delta_target_dir)
 
@@ -423,9 +424,11 @@ class XDelta3DirPatcher(object):
         print("Using %s as staging area" % patch_dir)
 
         print("Extracting archive...")
-        archive_object = XDelta3DirPatcher.get_archive_instance(patch_bundle)
-        for filename in archive_object.list_files():
-            archive_object.expand(filename, patch_dir)
+
+        archive_class = XDelta3DirPatcher.get_archive_class(patch_bundle)
+        with archive_class(patch_bundle) as archive_object:
+            for filename in archive_object.list_files():
+                archive_object.expand(filename, patch_dir)
 
         delta_patch_dir = path.join(patch_dir, self.PATCH_FOLDER)
 
@@ -472,21 +475,21 @@ class XDelta3DirPatcher(object):
 
     @staticmethod
     def get_random_string(length = 10):
-        return ''.join([random.choice('0123456789ABCDEF') for i in range(length)])
+        return ''.join([random.choice('0123456789abcdef') for i in range(length)])
 
     @staticmethod
-    def get_archive_instance(archive_path):
+    def get_archive_class(archive_path):
         # TODO: Have a dynamic list of implementations to loop over
 
         # Ordering is important here since other impl classes error out on
         # directory paths
         if path.isdir(archive_path):
-            return XDelta3FsImpl(archive_path)
+            return XDelta3FsImpl
 
         if tarfile.is_tarfile(archive_path):
-            return XDelta3TarImpl(archive_path)
+            return XDelta3TarImpl
         if zipfile.is_zipfile(archive_path):
-            return XDelta3ZipImpl(archive_path)
+            return XDelta3ZipImpl
 
         raise RuntimeError('Error! Archive %s bad or not supported!' % archive_path)
 
@@ -496,9 +499,10 @@ class XDelta3DirPatcher(object):
         expansion_dir = XDelta3DirPatcher._get_temp_dir(staging_dir, 'archive')
         print("Expanding %s into %s" % (path.basename(archive), expansion_dir))
 
-        archive_object = XDelta3DirPatcher.get_archive_instance(archive)
-        for filename in archive_object.list_files():
-            archive_object.expand(filename, expansion_dir)
+        archive_class = XDelta3DirPatcher.get_archive_class(archive)
+        with archive_class(archive) as archive_object:
+            for filename in archive_object.list_files():
+                archive_object.expand(filename, expansion_dir)
 
         return expansion_dir
 

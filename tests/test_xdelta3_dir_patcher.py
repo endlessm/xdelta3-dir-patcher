@@ -470,32 +470,32 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         rmtree(result_dir)
 
     # ------------------- Test for archive implementation picking
-    def test_get_archive_instance_returns_tar_for_correct_files(self):
+    def test_get_archive_class_returns_tar_for_correct_files(self):
         archive = path.join(self.TEST_FILE_PREFIX, 'old_version1.tgz')
-        impl_instance = patcher.XDelta3DirPatcher.get_archive_instance(archive)
+        impl_class = patcher.XDelta3DirPatcher.get_archive_class(archive)
 
-        self.assertEquals(impl_instance.__class__,
+        self.assertEquals(impl_class,
                           patcher.XDelta3TarImpl)
 
-    def test_get_archive_instance_returns_zip_for_correct_files(self):
+    def test_get_archive_class_returns_zip_for_correct_files(self):
         archive = path.join(self.TEST_FILE_PREFIX, 'old_version1.zip')
-        impl_instance = patcher.XDelta3DirPatcher.get_archive_instance(archive)
+        impl_class = patcher.XDelta3DirPatcher.get_archive_class(archive)
 
-        self.assertEquals(impl_instance.__class__,
+        self.assertEquals(impl_class,
                           patcher.XDelta3ZipImpl)
 
-    def test_get_archive_instance_returns_zip_for_correct_files(self):
+    def test_get_archive_class_returns_zip_for_correct_files(self):
         archive = path.join(self.TEST_FILE_PREFIX, 'fs_archive')
-        impl_instance = patcher.XDelta3DirPatcher.get_archive_instance(archive)
+        impl_class = patcher.XDelta3DirPatcher.get_archive_class(archive)
 
-        self.assertEquals(impl_instance.__class__,
+        self.assertEquals(impl_class,
                           patcher.XDelta3FsImpl)
 
-    def test_get_archive_instance_fails_if_not_supported(self):
+    def test_get_archive_class_fails_if_not_supported(self):
         bad_archive = path.join(self.TEST_FILE_PREFIX, 'not_an_archive.foo')
 
         with self.assertRaises(RuntimeError) as error:
-            patcher.XDelta3DirPatcher.get_archive_instance(bad_archive)
+            patcher.XDelta3DirPatcher.get_archive_class(bad_archive)
 
             # Sanity check
             self.assertTrue(False)
