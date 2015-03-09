@@ -64,14 +64,16 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
 
         expected_members = ['binary_file',
                             'long_lorem.txt',
+                            'new folder/',
                             'new folder/new file1.txt',
                             'short_lorem.txt',
                             'updated folder/updated file.txt',
+                            'updated folder/',
                             'updated folder/.hidden_updated_file.txt']
 
         actual_members = test_object.list_files()
 
-        self.assertEquals(6, len(actual_members))
+        self.assertEquals(len(expected_members), len(actual_members))
         for member in expected_members:
             self.assertIn(member, actual_members)
 

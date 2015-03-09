@@ -64,10 +64,14 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
 
         expected_members = ['binary_file',
                             'long_lorem.txt',
+                            'new folder/',
                             'new folder/new file1.txt',
+                            'new folder/new_folder/',
                             'new folder/new_folder/new_file2.txt',
                             'short_lorem.txt',
+                            'updated folder/',
                             'updated folder/updated file.txt',
+                            'updated folder/updated_folder/',
                             'updated folder/updated_folder/updated_file2.txt',
                             'updated folder/.hidden_updated_file.txt']
 

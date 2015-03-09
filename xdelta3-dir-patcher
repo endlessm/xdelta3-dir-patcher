@@ -29,16 +29,9 @@ class XDelta3FsImpl(object):
         self.path = path
 
     def list_files(self):
+        print('FS: Gathering filelist')
         files = []
         for root, dirs, filenames in walk(self.path):
-            for filename in filenames:
-                absolute_path = path.join(root, filename)
-
-                # Strip prefix so the files look relative
-                relative_path = path.relpath(absolute_path, self.path)
-
-                files.append(relative_path)
-
             for directory in dirs:
                 absolute_path = path.join(root, directory)
 
@@ -47,6 +40,15 @@ class XDelta3FsImpl(object):
 
                 files.append(relative_path)
 
+            for filename in filenames:
+                absolute_path = path.join(root, filename)
+
+                # Strip prefix so the files look relative
+                relative_path = path.relpath(absolute_path, self.path)
+
+                files.append(relative_path)
+
+        print('FS: Gathering completed')
         return files
 
     def expand(self, filename, extraction_path):
@@ -78,15 +80,43 @@ class XDelta3TarImpl(object):
         self.archive_path = archive_path
 
     def list_files(self):
-        files = []
+        print('Tar: Gathering filelist')
+        items = []
         with tarfile.open(self.archive_path) as archive_object:
-            files = archive_object.getnames()
+            members = archive_object.getmembers()
 
-        return files
+            # Lookup all member objects
+            for member in members:
+                # For directories, add a separator to the end
+                suffix = path.sep if member.isdir() else ''
+
+                items.append('%s%s' % (member.name, suffix))
+
+        # Append any directories that weren't part of the archive
+        for item in items:
+            dir_name = path.dirname(item) + path.sep
+            if len(dir_name) > 1 and not dir_name in items:
+                print('Post-adding %s to members' % dir_name)
+                items.append(dir_name)
+
+        print('Tar: Gathering completed')
+        return items
 
     def expand(self, filename, extraction_path):
         with tarfile.open(self.archive_path) as archive_object:
-            member = archive_object.getmember(filename)
+            try:
+                member = archive_object.getmember(filename)
+            except KeyError as key_error:
+                # Maybe we have a folder that was added to
+                # the filelist that isn't really ni the archive
+                if filename.endswith(path.sep):
+                    folder_path = path.join(extraction_path,
+                                            filename)
+
+                    if not path.isdir(folder_path):
+                        makedirs(folder_path)
+
+                    return
 
             if not path.isdir(extraction_path):
                 makedirs(extraction_path)
@@ -107,13 +137,12 @@ class XDelta3ZipImpl(object):
         self.archive_path = archive_path
 
     def list_files(self):
+        print('Zip: Gathering filelist')
         files = []
         with zipfile.ZipFile(self.archive_path, 'r') as archive_object:
             files = archive_object.namelist()
 
-        # Filter folder names (they end with '/')
-        files = [ name for name in files if not name.endswith(sep) ]
-
+        print('Zip: Gathering completed')
         return files
 
     def expand(self, filename, extraction_path):
