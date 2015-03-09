@@ -83,9 +83,26 @@ class XDelta3FsImpl(object):
 class XDelta3TarImpl(object):
     TAR_FORMAT = 'gz'
 
-    def __init__(self, archive_path):
+    def __init__(self, archive_path, for_writing = False):
         self.archive_path = archive_path
         self.items = None
+        self.for_writing = for_writing
+
+    def __enter__(self):
+        flags = 'r:*'
+
+        if self.for_writing:
+            if path.isfile(self.archive_path):
+                raise Exception('Error! Archive already present!')
+
+            flags = 'w:%s' % self.TAR_FORMAT
+
+        self.archive_object = tarfile.open(self.archive_path, flags)
+
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.archive_object.close()
 
     def list_files(self):
         if self.items:
@@ -117,34 +134,29 @@ class XDelta3TarImpl(object):
         return self.items
 
     def expand(self, filename, extraction_path):
-        with tarfile.open(self.archive_path) as archive_object:
-            try:
-                member = archive_object.getmember(filename)
-            except KeyError as key_error:
-                # Maybe we have a folder that was added to
-                # the filelist that isn't really ni the archive
-                if filename.endswith(path.sep):
-                    folder_path = path.join(extraction_path,
-                                            filename)
+        try:
+            member = self.archive_object.getmember(filename)
+        except KeyError as key_error:
+            # Maybe we have a folder that was added to
+            # the filelist that isn't really ni the archive
+            if filename.endswith(path.sep):
+                folder_path = path.join(extraction_path,
+                                        filename)
 
-                    if not path.isdir(folder_path):
-                        makedirs(folder_path)
+                if not path.isdir(folder_path):
+                    makedirs(folder_path)
 
-                    return
+                return
 
-            if not path.isdir(extraction_path):
-                makedirs(extraction_path)
+        if not path.isdir(extraction_path):
+            makedirs(extraction_path)
 
-            archive_object.extract(member, extraction_path)
+        self.archive_object.extract(member, extraction_path)
 
     def create(self, base_dir):
-        if path.isfile(self.archive_path):
-            raise Exception('Error! Archive already present!')
-
-        with tarfile.open(self.archive_path, 'w:%s' % self.TAR_FORMAT) as archive_object:
-            for item in listdir(base_dir):
-                full_path = path.join(base_dir, item)
-                archive_object.add(full_path, item)
+        for item in listdir(base_dir):
+            full_path = path.join(base_dir, item)
+            self.archive_object.add(full_path, item)
 
 class XDelta3ZipImpl(object):
     def __init__(self, archive_path):

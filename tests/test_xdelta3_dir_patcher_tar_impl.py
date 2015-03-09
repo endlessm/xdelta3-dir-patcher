@@ -70,75 +70,67 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
 
     def test_can_list_members_correctly(self):
         archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
-        test_object = self.test_class(archive)
+        with self.test_class(archive) as test_object:
+            actual_members = test_object.list_files()
 
-        actual_members = test_object.list_files()
+            self.assertEquals(len(self.expected_new_version1_members()),
+                              len(actual_members))
 
-        self.assertEquals(len(self.expected_new_version1_members()),
-                          len(actual_members))
-
-        for member in self.expected_new_version1_members():
-            self.assertIn(member, actual_members)
+            for member in self.expected_new_version1_members():
+                self.assertIn(member, actual_members)
 
     def test_list_members_is_cached(self):
         orig_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
         archive = path.join(self.temp_dir, 'new_version1.tgz')
         copyfile(orig_archive, archive)
 
-        test_object = self.test_class(archive)
+        with self.test_class(archive) as test_object:
+            # Force a load of the index
+            initial_members = test_object.list_files()
+            self.assertEquals(len(self.expected_new_version1_members()),
+                              len(initial_members))
 
-        # Force a load of the index
-        initial_members = test_object.list_files()
-        self.assertEquals(len(self.expected_new_version1_members()),
-                          len(initial_members))
+            # Remove the archive
+            remove(archive)
 
-        # Remove the archive
-        remove(archive)
+            # Test invocation
+            actual_members = test_object.list_files()
 
-        # Test invocation
-        actual_members = test_object.list_files()
-
-        self.assertEquals(len(self.expected_new_version1_members()),
-                          len(actual_members))
-        for member in self.expected_new_version1_members():
-            self.assertIn(member, actual_members)
+            self.assertEquals(len(self.expected_new_version1_members()),
+                              len(actual_members))
+            for member in self.expected_new_version1_members():
+                self.assertIn(member, actual_members)
 
     def test_can_extract_members_correctly(self):
         archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
-        test_object = self.test_class(archive)
 
-        test_object.expand('new folder/new file1.txt', self.temp_dir)
+        with self.test_class(archive) as test_object:
+            test_object.expand('new folder/new file1.txt', self.temp_dir)
+            actual_content = self.get_content(path.join(self.temp_dir,
+                                                        'new folder',
+                                                        'new file1.txt'))
 
-        actual_content = self.get_content(path.join(self.temp_dir,
-                                                    'new folder',
-                                                    'new file1.txt'))
-
-        self.assertEquals(b'new file content\n', actual_content)
+            self.assertEquals(b'new file content\n', actual_content)
 
     def test_can_extract_members_correctly_in_already_created_dir(self):
         archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
-        test_object = self.test_class(archive)
 
-        test_object.expand('new folder/new file1.txt', self.temp_dir)
-
-        try:
+        with self.test_class(archive) as test_object:
             test_object.expand('new folder/new file1.txt', self.temp_dir)
-        except:
-            self.fail("Should not have thrown an error on expanding same item")
+
+            try:
+                test_object.expand('new folder/new file1.txt', self.temp_dir)
+            except:
+                self.fail("Should not have thrown an error on expanding same item")
 
     def test_impl_can_create_correctly(self):
         archive = path.join(self.temp_dir, 'test_archive.tgz')
 
         source_dir = path.join(self.TEST_FILE_PREFIX, 'new_version1')
 
-        test_object = self.test_class(archive)
-
-        # Add the files to archive
-        test_object.create(source_dir)
-
-        # Ensure that the archive was closed if it was opened
-        # so that we can reopen and test that the file was added
-        del test_object
+        with self.test_class(archive, True) as test_object:
+            # Add the files to archive
+            test_object.create(source_dir)
 
         with tarfile.open(archive) as archive_object:
             archive_object.extractall(self.temp_dir2)
