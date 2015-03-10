@@ -10,7 +10,7 @@ from os import cpu_count
 # often.
 patcher = imp.load_source("xdelta3-dir-patcher", "xdelta3-dir-patcher")
 
-class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
+class TestExecutorRunner(unittest.TestCase):
     def setUp(self):
         self.test_class = patcher.ExecutorRunner
 

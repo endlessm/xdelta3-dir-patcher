@@ -458,52 +458,6 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
         patcher.XDelta3DirPatcher(args, delta_impl = MockXDImplStagingTest).run()
 
-    def test_expand_archive_works(self):
-        archive = path.join(self.TEST_FILE_PREFIX, 'old_version1.tgz')
-        old_dir = path.join(self.TEST_FILE_PREFIX, 'old_version1')
-
-        result_dir = patcher.XDelta3DirPatcher.expand_archive(archive)
-
-        self.compare_trees(result_dir, old_dir)
-
-        # Clean up
-        rmtree(result_dir)
-
-    # ------------------- Test for archive implementation picking
-    def test_get_archive_class_returns_tar_for_correct_files(self):
-        archive = path.join(self.TEST_FILE_PREFIX, 'old_version1.tgz')
-        impl_class = patcher.XDelta3DirPatcher.get_archive_class(archive)
-
-        self.assertEquals(impl_class,
-                          patcher.XDelta3TarImpl)
-
-    def test_get_archive_class_returns_zip_for_correct_files(self):
-        archive = path.join(self.TEST_FILE_PREFIX, 'old_version1.zip')
-        impl_class = patcher.XDelta3DirPatcher.get_archive_class(archive)
-
-        self.assertEquals(impl_class,
-                          patcher.XDelta3ZipImpl)
-
-    def test_get_archive_class_returns_zip_for_correct_files(self):
-        archive = path.join(self.TEST_FILE_PREFIX, 'fs_archive')
-        impl_class = patcher.XDelta3DirPatcher.get_archive_class(archive)
-
-        self.assertEquals(impl_class,
-                          patcher.XDelta3FsImpl)
-
-    def test_get_archive_class_fails_if_not_supported(self):
-        bad_archive = path.join(self.TEST_FILE_PREFIX, 'not_an_archive.foo')
-
-        with self.assertRaises(RuntimeError) as error:
-            patcher.XDelta3DirPatcher.get_archive_class(bad_archive)
-
-            # Sanity check
-            self.assertTrue(False)
-
-        exception = error.exception
-        self.assertEqual(str(exception),
-                         'Error! Archive %s bad or not supported!' % bad_archive)
-
     # ------------------- XDeltaImpl tests
     def test_xdelta_impl_run_command_invokes_the_command(self):
         # TODO: implement the test

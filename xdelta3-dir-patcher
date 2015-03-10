@@ -71,6 +71,25 @@ class ExecutorRunner(object):
         print('Runner time: %.2fs' % (time.time() - self.start_time))
 
 # ---------------------------- ARCHIVE ADAPTERS ----------------------------
+class XDeltaArchive(object):
+    def __init__(self, archive_path):
+        self.archive_object = XDeltaArchive.get_archive_instance(archive_path)
+
+    def __enter__(self):
+        return self.archive_object
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.archive_object.close()
+
+    @staticmethod
+    def get_archive_instance(archive_path):
+        for clazz in XDelta3AbstractArchiveImpl.__subclasses__():
+            print(clazz)
+            if clazz.can_open(archive_path):
+                return clazz(archive_path)
+
+        raise RuntimeError('Error! Archive %s bad or not supported!' % archive_path)
+
 class XDelta3AbstractArchiveImpl(object):
     def __init__(self):
         self.lock = threading.Lock()
@@ -108,6 +127,10 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
 
     def close(self):
         pass
+
+    @staticmethod
+    def can_open(archive):
+        return path.isdir(archive)
 
     def list_files(self):
         if self.items:
@@ -185,6 +208,10 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
 
     def close(self):
         self._close_archive()
+
+    @staticmethod
+    def can_open(archive):
+        return path.isfile(archive) and tarfile.is_tarfile(archive)
 
     def list_files(self):
         if self.items:
@@ -268,6 +295,10 @@ class XDelta3ZipImpl(XDelta3AbstractArchiveImpl):
 
     def close(self):
         self._close_archive()
+
+    @staticmethod
+    def can_open(archive):
+        return path.isfile(archive) and zipfile.is_zipfile(archive)
 
     def list_files(self):
         if self.items:
@@ -476,11 +507,8 @@ class XDelta3DirPatcher(object):
         if not path.isdir(delta_target_dir):
             mkdir(delta_target_dir)
 
-        old_archive_class = self.get_archive_class(old_dir)
-        new_archive_class = self.get_archive_class(new_dir)
-
-        with old_archive_class(old_dir) as old_archive_obj, \
-             new_archive_class(new_dir) as new_archive_obj:
+        with XDeltaArchive(old_dir) as old_archive_obj, \
+             XDeltaArchive(new_dir) as new_archive_obj:
             old_staging_dir = self._get_temp_dir(staging_dir, 'old_src')
             new_staging_dir = self._get_temp_dir(staging_dir, 'new_src')
 
@@ -557,8 +585,7 @@ class XDelta3DirPatcher(object):
             delta_patch_dir = path.join(delta_patch_dir, root_patch_dir)
 
         print("Extracting archive...")
-        archive_class = XDelta3DirPatcher.get_archive_class(patch_bundle)
-        with archive_class(patch_bundle) as archive_object:
+        with XDeltaArchive(patch_bundle) as archive_object:
             for filename in archive_object.list_files():
                 archive_object.expand(filename, patch_dir)
 
@@ -602,35 +629,6 @@ class XDelta3DirPatcher(object):
     @staticmethod
     def get_random_string(length = 8):
         return ''.join([random.choice('0123456789abcdef') for i in range(length)])
-
-    @staticmethod
-    def get_archive_class(archive_path):
-        # TODO: Have a dynamic list of implementations to loop over
-
-        # Ordering is important here since other impl classes error out on
-        # directory paths
-        if path.isdir(archive_path):
-            return XDelta3FsImpl
-
-        if tarfile.is_tarfile(archive_path):
-            return XDelta3TarImpl
-        if zipfile.is_zipfile(archive_path):
-            return XDelta3ZipImpl
-
-        raise RuntimeError('Error! Archive %s bad or not supported!' % archive_path)
-
-    @classmethod
-    def expand_archive(clazz, archive, staging_dir = None):
-        # Figure out where to expand the archive
-        expansion_dir = XDelta3DirPatcher._get_temp_dir(staging_dir, 'archive')
-        print("Expanding %s into %s" % (path.basename(archive), expansion_dir))
-
-        archive_class = XDelta3DirPatcher.get_archive_class(archive)
-        with archive_class(archive) as archive_object:
-            for filename in archive_object.list_files():
-                archive_object.expand(filename, expansion_dir)
-
-        return expansion_dir
 
     def run(self):
         print("Running directory patcher...")

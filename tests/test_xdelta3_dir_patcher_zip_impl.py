@@ -75,6 +75,14 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
                 'updated folder/updated_folder/updated_file2.txt',
                 'updated folder/.hidden_updated_file.txt']
 
+    def test_can_open_works(self):
+        prefix = path.join('tests', 'test_files', 'archive_instance')
+        file_pattern = path.join(prefix, 'old_version1%s')
+
+        self.assertFalse(self.test_class.can_open(file_pattern % ''))
+        self.assertFalse(self.test_class.can_open(file_pattern % '.tgz'))
+        self.assertTrue(self.test_class.can_open(file_pattern % '.zip'))
+        self.assertFalse(self.test_class.can_open('abcd'))
 
     def test_can_list_members_correctly(self):
         archive = self.get_archive('new_version1')

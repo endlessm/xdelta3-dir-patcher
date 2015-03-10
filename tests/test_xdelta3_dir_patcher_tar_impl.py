@@ -71,6 +71,15 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
                 'updated folder/updated file.txt',
                 'updated folder/.hidden_updated_file.txt']
 
+    def test_can_open_works(self):
+        prefix = path.join('tests', 'test_files', 'archive_instance')
+        file_pattern = path.join(prefix, 'old_version1%s')
+
+        self.assertFalse(self.test_class.can_open(file_pattern % ''))
+        self.assertTrue(self.test_class.can_open(file_pattern % '.tgz'))
+        self.assertFalse(self.test_class.can_open(file_pattern % '.zip'))
+        self.assertFalse(self.test_class.can_open('abcd'))
+
     def test_can_list_members_correctly(self):
         archive = self.get_archive('new_version1')
         with self.test_class(archive) as test_object:
