@@ -6,7 +6,7 @@ from filecmp import dircmp, cmpfiles
 from mock import Mock
 from shutil import rmtree, copyfile
 from tempfile import mkdtemp
-from os import path, chmod, makedirs, walk, remove
+from os import cpu_count, path, chmod, makedirs, walk, remove
 from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH
 
 # Dashes are standard for exec scipts but not allowed for modules in Python. We
@@ -136,3 +136,22 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
             archive_object.extractall(self.temp_dir2)
 
         self.compare_trees(source_dir, self.temp_dir2)
+
+    # XXX: tarfile implementation is not thread-safe after trying it out
+    @unittest.skipIf(cpu_count() <= 3, \
+                     'This test requires 3 or more virtal CPUs')
+    def test_extract_is_thread_locked(self):
+        archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
+
+        self.executor_runner = patcher.ExecutorRunner()
+
+        with self.test_class(archive) as test_object:
+            # Force a load of the index
+            initial_members = test_object.list_files()
+
+            for member in initial_members:
+                for i in range(0, 10):
+                    self.executor_runner.add_task(test_object.expand,
+                                                  (member, self.temp_dir))
+
+            self.executor_runner.join_all()
