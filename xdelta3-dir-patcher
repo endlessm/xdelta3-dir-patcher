@@ -4,15 +4,20 @@ import argparse
 import tarfile
 import zipfile
 import random
+import logging
+import time
+import threading
+import multiprocessing
+import concurrent.futures
 
 from stat import *
 from filecmp import dircmp
-from sys import stderr
+from sys import stderr, stdout
 from tempfile import mkdtemp
 from subprocess import check_output, STDOUT
 from shutil import copymode, copystat, copyfile, copy2, rmtree, copytree
-from os import chmod, chown, geteuid, listdir, makedirs, mkdir, path, readlink
-from os import remove, symlink, sep, stat, walk
+from os import chmod, chown, cpu_count, geteuid, listdir, makedirs, mkdir
+from os import path, readlink, remove, symlink, sep, stat, walk
 
 VERSION='0.6'
 
@@ -22,6 +27,48 @@ class AttributeDict(dict):
         return self[attr]
     def __setattr__(self, attr, value):
         self[attr] = value
+
+# ---------------------------- PROCESS RUNNER ----------------------------
+class ExecutorRunner(object):
+    def __init__(self, debug = False):
+        # multiprocessing.log_to_stderr(logging.DEBUG)
+
+        self.futures = []
+        self.start_time = None
+        thread_count = max(cpu_count() - 1, 1)
+
+        self.debug = debug
+
+        self.executor = concurrent.futures.ThreadPoolExecutor(thread_count)
+
+    def _fix_terminal(self):
+        stdout.flush()
+        print()
+
+    def add_task(self, target_func, target_func_args):
+        if self.start_time == None:
+            self.start_time = time.time()
+
+        self.futures.append(self.executor.submit(target_func, *target_func_args))
+
+    def join_all(self):
+        if self.debug:
+            # Make sure that the terminal isn't in some strange state
+            self._fix_terminal()
+
+            print('Waiting for tasks to finish...')
+
+        # Prevent further scheduling
+        self.executor.shutdown(False)
+
+        for future in concurrent.futures.as_completed(self.futures):
+            if future.exception():
+                raise future.exception()
+
+        # Leftover runners might have again clobbered the output
+        self._fix_terminal()
+
+        print('Runner time: %.2fs' % (time.time() - self.start_time))
 
 # ---------------------------- ARCHIVE ADAPTERS ----------------------------
 class XDelta3FsImpl(object):
