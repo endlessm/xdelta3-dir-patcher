@@ -346,6 +346,17 @@ class XDelta3DirPatcher(object):
         chown(dest_file,uid,gid)
 
     @staticmethod
+    def _safe_makedirs(dir_path):
+        try:
+            makedirs(dir_path)
+        # Concurrency problems need to be handled. If two threads create
+        # the same dir, there might be a race between them checking and
+        # doing makedirs so we handle that "gracefully" here.
+        except FileExistsError as fee:
+            if not path.isdir(dir_path):
+                raise fee
+
+    @staticmethod
     def _get_temp_dir(staging_dir, prefix):
         temp_dir = None
         if staging_dir:
@@ -360,17 +371,27 @@ class XDelta3DirPatcher(object):
 
         return temp_dir
 
-    def _find_file_delta(self, filename, old_root, new_root, target_root):
-        print("Processing %s" % filename)
+    def _find_file_delta(self, filename, old_archive_obj, new_archive_obj,
+                          old_root,
+                          new_root,
+                          target_root):
+        if self.args.debug:
+            print("Processing %s" % filename)
+        else:
+            print('#', end = "")
+        stdout.flush()
+
+        new_archive_obj.expand(filename, new_root)
+
+        if filename in old_archive_obj.list_files():
+            old_archive_obj.expand(filename, old_root)
 
         old_path = path.join(old_root, filename)
         new_path = path.join(new_root, filename)
         target_path = path.join(target_root, filename)
 
         target_dir = path.dirname(target_path)
-        if not path.isdir(target_dir):
-            # FIXME: Copy all permissions for these
-            makedirs(target_dir)
+        XDelta3DirPatcher._safe_makedirs(target_dir)
 
         if self.args.debug: print([old_path, new_path, target_path])
 
@@ -393,6 +414,12 @@ class XDelta3DirPatcher(object):
             self.delta_impl.diff(old_path, new_path, target_path, self.args.debug)
 
             self.copy_attributes(new_path, target_path)
+
+        # Remove each individual file as they're processed
+        # to reduce needed size on-disk
+        for item in [old_path, new_path]:
+            if item and (path.isfile(item) or path.islink(item)):
+                remove(item)
 
     def _apply_file_delta(self, rel_path, patch_file, old_root, patch_root, target_root):
         print("Processing %s" % patch_file)
@@ -428,10 +455,12 @@ class XDelta3DirPatcher(object):
 
     # TODO: Unit test me
     def diff(self, old_dir, new_dir, patch_bundle, metadata = None,
-             staging_dir = None):
+             staging_dir = None,
+             runner = ExecutorRunner()):
         target_dir = self._get_temp_dir(staging_dir, 'target')
 
         print("Using %s as staging area" % target_dir)
+        stdout.flush()
 
         delta_target_dir = path.join(target_dir, self.PATCH_FOLDER)
         if not path.isdir(delta_target_dir):
@@ -445,15 +474,31 @@ class XDelta3DirPatcher(object):
             old_staging_dir = self._get_temp_dir(staging_dir, 'old_src')
             new_staging_dir = self._get_temp_dir(staging_dir, 'new_src')
 
+            # XXX: Preload old archive file list to avoid concurrency issues
+            # TODO: Make the listing thread-safe
+            old_archive_obj.list_files()
+
             for filename in new_archive_obj.list_files():
                 if filename.endswith('/'):
                     continue
 
-            self._find_file_delta(filename, old_staging_dir, new_staging_dir, delta_target_dir)
+                if self.args.debug:
+                    print('Expanding %s' % filename)
+                else:
+                    print('.', end = "")
+
+                runner.add_task(self._find_file_delta, (filename,
+                                                        old_archive_obj,
+                                                        new_archive_obj,
+                                                        old_staging_dir,
+                                                        new_staging_dir,
+                                                        delta_target_dir))
+
+            # Wait until we diffed everything
+            runner.join_all()
 
         # FIXME: Figure out how to handle dirs (premissions/uids/etc)
 
-        # TODO: Remove each individual file as they're processed
         rmtree(old_staging_dir)
         rmtree(new_staging_dir)
 
