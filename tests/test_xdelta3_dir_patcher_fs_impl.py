@@ -59,6 +59,9 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
 
         return content
 
+    def get_archive(self, name):
+        return path.join(self.TEST_FILE_PREFIX, '%s' % name)
+
     def expected_new_version1_members(self):
         return ['binary_file',
                 'long_lorem.txt',
@@ -75,7 +78,7 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
 
 
     def test_can_list_members_correctly(self):
-        archive = path.join(self.TEST_FILE_PREFIX, 'new_version1')
+        archive = self.get_archive('new_version1')
         with self.test_class(archive) as test_object:
             actual_members = test_object.list_files()
 
@@ -86,6 +89,7 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
                 self.assertIn(member, actual_members)
 
     def test_list_members_is_cached(self):
+        archive = self.get_archive('new_version1')
         orig_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1')
         archive = path.join(self.temp_dir, 'new_version1')
         copytree(orig_archive, archive)
@@ -108,7 +112,7 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
                 self.assertIn(member, actual_members)
 
     def test_can_extract_files_correctly(self):
-        archive = path.join(self.TEST_FILE_PREFIX, 'new_version1')
+        archive = self.get_archive('new_version1')
         test_object = self.test_class(archive)
 
         with self.test_class(archive) as test_object:
@@ -120,7 +124,7 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
             self.assertEquals(b'new file content\n', actual_content)
 
     def test_can_extract_folders_correctly(self):
-        archive = path.join(self.TEST_FILE_PREFIX, 'new_version1')
+        archive = self.get_archive('new_version1')
         test_object = self.test_class(archive)
 
         folder_name = 'new folder/'
@@ -129,8 +133,22 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
 
         self.assertTrue(path.isdir(path.join(self.temp_dir, folder_name)))
 
+    def test_can_be_manually_opened_and_closed(self):
+        archive = self.get_archive('new_version1')
+
+        test_object = self.test_class(archive)
+
+        test_object.expand('new folder/new file1.txt', self.temp_dir)
+        actual_content = self.get_content(path.join(self.temp_dir,
+                                                    'new folder',
+                                                    'new file1.txt'))
+
+        self.assertEquals(b'new file content\n', actual_content)
+
+        test_object.close()
+
     def test_can_extract_members_correctly_in_already_created_dir(self):
-        archive = path.join(self.TEST_FILE_PREFIX, 'new_version1')
+        archive = self.get_archive('new_version1')
         with self.test_class(archive) as test_object:
             test_object.expand('new folder/new file1.txt', self.temp_dir)
 

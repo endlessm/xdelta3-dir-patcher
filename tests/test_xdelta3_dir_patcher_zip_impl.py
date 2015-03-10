@@ -58,6 +58,9 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
 
         return content
 
+    def get_archive(self, name):
+        return path.join(self.TEST_FILE_PREFIX, '%s.zip' % name)
+
     def expected_new_version1_members(self):
         return ['binary_file',
                 'long_lorem.txt',
@@ -74,7 +77,7 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
 
 
     def test_can_list_members_correctly(self):
-        archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.zip')
+        archive = self.get_archive('new_version1')
         with self.test_class(archive) as test_object:
             actual_members = test_object.list_files()
 
@@ -85,7 +88,7 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
                 self.assertIn(member, actual_members)
 
     def test_list_members_is_cached(self):
-        orig_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.zip')
+        orig_archive = self.get_archive('new_version1')
         archive = path.join(self.temp_dir, 'new_version1.zip')
         copyfile(orig_archive, archive)
 
@@ -107,7 +110,7 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
                 self.assertIn(member, actual_members)
 
     def test_can_extract_members_correctly(self):
-        archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.zip')
+        archive = self.get_archive('new_version1')
 
         with self.test_class(archive) as test_object:
             test_object.expand('new folder/new file1.txt', self.temp_dir)
@@ -117,8 +120,35 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
 
             self.assertEquals(b'new file content\n', actual_content)
 
+    def test_can_be_manually_opened_and_closed(self):
+        archive = self.get_archive('new_version1')
+
+        test_object = self.test_class(archive)
+
+        test_object.expand('new folder/new file1.txt', self.temp_dir)
+        actual_content = self.get_content(path.join(self.temp_dir,
+                                                    'new folder',
+                                                    'new file1.txt'))
+
+        self.assertEquals(b'new file content\n', actual_content)
+
+        test_object.close()
+
+    def test_manually_closed_archive_is_not_usable(self):
+        archive = self.get_archive('new_version1')
+
+        test_object = self.test_class(archive)
+        test_object.close()
+
+        try:
+            test_object.expand('new folder/new file1.txt', self.temp_dir)
+
+            raise Exception('Unexpected exception thrown')
+        except RuntimeError as e:
+            pass
+
     def test_can_extract_members_correctly_in_already_created_dir(self):
-        archive = path.join(self.TEST_FILE_PREFIX, 'new_version1.zip')
+        archive = self.get_archive('new_version1')
 
         with self.test_class(archive) as test_object:
             test_object.expand('new folder/new file1.txt', self.temp_dir)
