@@ -24,7 +24,7 @@ optional arguments:
 ```
 
 ### License
-MIT
+LGPL v2.1
 
 ### Running tests
 - Prerequisites:
