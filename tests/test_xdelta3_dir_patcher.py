@@ -43,6 +43,9 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         self.temp_dir2 = mkdtemp(prefix="%s_" % self.__class__.__name__)
         chmod(self.temp_dir2, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
 
+        self.test_class = patcher.XDelta3DirPatcher
+        self.xdelta_test_class = patcher.XDelta3Impl
+
     def tearDown(self):
         rmtree(self.temp_dir)
         rmtree(self.temp_dir2)
@@ -90,7 +93,10 @@ class TestXDelta3DirPatcher(unittest.TestCase):
     def test_apply_patch_works(self):
         old_path = path.join(self.TEST_FILE_PREFIX, 'old_version1')
         delta_path = path.join(self.TEST_FILE_PREFIX, 'patch1.xdelta.tgz')
-        output = check_output(["./%s" % self.EXECUTABLE, "apply", old_path, delta_path, self.temp_dir, "--ignore-euid"] )
+        output = check_output(["./%s" % self.EXECUTABLE, "apply", old_path,
+                               delta_path,
+                               self.temp_dir,
+                               "--ignore-euid"] )
 
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
 
@@ -117,7 +123,10 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         delta_path = path.join(self.TEST_FILE_PREFIX, 'patch1.xdelta.tgz')
 
         rmtree(self.temp_dir)
-        output = check_output(["./%s" % self.EXECUTABLE, "apply", old_path, delta_path, self.temp_dir, "--ignore-euid"] )
+        output = check_output(["./%s" % self.EXECUTABLE, "apply", old_path,
+                               delta_path,
+                               self.temp_dir,
+                               "--ignore-euid"] )
 
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
 
@@ -130,7 +139,10 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         copytree(old_path, self.temp_dir)
 
         delta_path = path.join(self.TEST_FILE_PREFIX, 'patch1.xdelta.tgz')
-        output = check_output(["./%s" % self.EXECUTABLE, "apply", self.temp_dir, delta_path, "--ignore-euid"] )
+        output = check_output(["./%s" % self.EXECUTABLE, "apply",
+                               self.temp_dir,
+                               delta_path,
+                               "--ignore-euid"] )
 
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
         self.compare_trees(self.temp_dir, new_path)
@@ -156,7 +168,9 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         old_path = path.join(self.TEST_FILE_PREFIX, 'old_version_symlinks1')
         delta_path = path.join(self.TEST_FILE_PREFIX, 'patch_symlinks1.xdelta.tgz')
 
-        check_output(["./%s" % self.EXECUTABLE, "apply", old_path, delta_path, self.temp_dir, "--ignore-euid"] )
+        check_output(["./%s" % self.EXECUTABLE, "apply", old_path, delta_path,
+                      self.temp_dir,
+                      "--ignore-euid"] )
 
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version_symlinks1')
         self.compare_trees(self.temp_dir, new_path)
@@ -167,8 +181,12 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
         generated_delta_path = path.join(self.temp_dir2, 'patch.xdelta')
 
-        check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_path, generated_delta_path] )
-        check_output(["./%s" % self.EXECUTABLE, "apply", old_path, generated_delta_path, self.temp_dir, "--ignore-euid"] )
+        check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_path,
+                      generated_delta_path] )
+        check_output(["./%s" % self.EXECUTABLE, "apply", old_path,
+                      generated_delta_path,
+                      self.temp_dir,
+                      "--ignore-euid"] )
 
         self.compare_trees(self.temp_dir, new_path)
 
@@ -180,8 +198,12 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         new_bundle = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
         generated_delta_path = path.join(self.temp_dir2, 'patch.xdelta')
 
-        check_output(["./%s" % self.EXECUTABLE, "diff", old_bundle, new_bundle, generated_delta_path] )
-        check_output(["./%s" % self.EXECUTABLE, "apply", old_path, generated_delta_path, self.temp_dir, "--ignore-euid"] )
+        check_output(["./%s" % self.EXECUTABLE, "diff", old_bundle, new_bundle,
+                      generated_delta_path] )
+        check_output(["./%s" % self.EXECUTABLE, "apply", old_path,
+                      generated_delta_path,
+                      self.temp_dir,
+                      "--ignore-euid"] )
 
         self.compare_trees(self.temp_dir, new_path)
 
@@ -217,8 +239,9 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         staging_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
 
         try:
-            check_output(["./%s" % self.EXECUTABLE, "diff",
+            check_output(["./%s" % self.EXECUTABLE,
                           "--staging-dir", staging_dir,
+                          "diff",
                           old_bundle,
                           new_bundle,
                           generated_delta_path] )
@@ -239,8 +262,12 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
         generated_delta_path = path.join(self.temp_dir2, 'patch.xdelta')
 
-        check_output(["./%s" % self.EXECUTABLE, "diff", old_bundle, new_path, generated_delta_path] )
-        check_output(["./%s" % self.EXECUTABLE, "apply", old_path, generated_delta_path, self.temp_dir, "--ignore-euid"] )
+        check_output(["./%s" % self.EXECUTABLE, "diff", old_bundle, new_path,
+                      generated_delta_path] )
+        check_output(["./%s" % self.EXECUTABLE, "apply", old_path,
+                      generated_delta_path,
+                      self.temp_dir,
+                      "--ignore-euid"] )
 
         self.compare_trees(self.temp_dir, new_path)
 
@@ -251,8 +278,12 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         new_bundle = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
         generated_delta_path = path.join(self.temp_dir2, 'patch.xdelta')
 
-        check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_bundle, generated_delta_path] )
-        check_output(["./%s" % self.EXECUTABLE, "apply", old_path, generated_delta_path, self.temp_dir, "--ignore-euid"] )
+        check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_bundle,
+                      generated_delta_path] )
+        check_output(["./%s" % self.EXECUTABLE, "apply", old_path,
+                      generated_delta_path,
+                      self.temp_dir,
+                      "--ignore-euid"] )
 
         self.compare_trees(self.temp_dir, new_path)
 
@@ -263,8 +294,12 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
         generated_delta_path = path.join(self.temp_dir2, 'patch_symlinks.xdelta')
 
-        check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_path, generated_delta_path] )
-        check_output(["./%s" % self.EXECUTABLE, "apply", old_path, generated_delta_path, self.temp_dir, "--ignore-euid"] )
+        check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_path,
+                      generated_delta_path] )
+        check_output(["./%s" % self.EXECUTABLE, "apply", old_path,
+                      generated_delta_path,
+                      self.temp_dir,
+                      "--ignore-euid"] )
 
         self.compare_trees(self.temp_dir, new_path)
 
@@ -308,7 +343,10 @@ class TestXDelta3DirPatcher(unittest.TestCase):
     def test_apply_usage_is_not_printed_if_args_are_correct(self):
         old_path = path.join(self.TEST_FILE_PREFIX, 'old_version1')
         delta_path = path.join(self.TEST_FILE_PREFIX, 'patch1.xdelta.tgz')
-        output = check_output(["./%s" % self.EXECUTABLE, "apply", old_path, delta_path, self.temp_dir, "--ignore-euid"] )
+        output = check_output(["./%s" % self.EXECUTABLE, "apply", old_path,
+                               delta_path,
+                               self.temp_dir,
+                               "--ignore-euid"] )
         self.assertNotIn("usage: ", output.decode('utf-8'))
 
     def test_apply_usage_is_not_printed_if_args_are_correct2(self):
@@ -318,7 +356,10 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         copytree(old_path, self.temp_dir)
 
         delta_path = path.join(self.TEST_FILE_PREFIX, 'patch1.xdelta.tgz')
-        output = check_output(["./%s" % self.EXECUTABLE, "apply", self.temp_dir, delta_path, "--ignore-euid"] )
+        output = check_output(["./%s" % self.EXECUTABLE, "apply",
+                               self.temp_dir,
+                               delta_path,
+                               "--ignore-euid"] )
         self.assertNotIn("usage: ",
                          output.decode('utf-8'))
 
@@ -344,7 +385,9 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         old_path = path.join(self.TEST_FILE_PREFIX, 'old_version1')
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
         delta_path = path.join(self.temp_dir, 'foo.tgz')
-        output = check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_path, delta_path] )
+        output = check_output(["./%s" % self.EXECUTABLE, "diff", old_path,
+                               new_path,
+                               delta_path] )
         self.assertNotIn("usage: ", output.decode('utf-8'))
 
     def test_other_actions_are_not_allowed(self):
@@ -367,7 +410,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         args.staging_dir = 'staging_dir'
         args.debug = False
 
-        test_object = patcher.XDelta3DirPatcher(args)
+        test_object = self.test_class(args)
         test_object.diff = Mock()
 
         test_object.run()
@@ -383,14 +426,16 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         args.patch_bundle = 'patch'
         args.ignore_euid = True
         args.target_dir = 'target'
+        args.staging_dir = 'foo'
         args.root_patch_dir = None
 
-        test_object = patcher.XDelta3DirPatcher(args)
+        test_object = self.test_class(args)
         test_object.apply = Mock()
 
         test_object.run()
 
-        test_object.apply.assert_called_once_with('old', 'patch', 'target', None)
+        test_object.apply.assert_called_once_with('old', 'patch', 'target',
+                                                  None, 'foo')
 
     def test_run_calls_apply_with_correct_arguments_if_action_is_apply_and_root_is_specified(self):
         args = patcher.AttributeDict()
@@ -400,14 +445,16 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         args.ignore_euid = True
         args.target_dir = 'target'
         args.root_patch_dir = 'foobar'
+        args.staging_dir = 'bar'
 
-        test_object = patcher.XDelta3DirPatcher(args)
+        test_object = self.test_class(args)
         test_object.apply = Mock()
 
         test_object.run()
 
-        test_object.apply.assert_called_once_with('old', 'patch', 'target', 'foobar')
-
+        test_object.apply.assert_called_once_with('old', 'patch', 'target',
+                                                  'foobar',
+                                                  'bar')
 
     def test_run_calls_apply_with_correct_arguments_if_action_is_apply_and_no_target_specified(self):
         args = patcher.AttributeDict()
@@ -417,27 +464,29 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         args.ignore_euid = True
         args.target_dir = None
         args.root_patch_dir = None
+        args.staging_dir = 'staging_dir'
 
-        test_object = patcher.XDelta3DirPatcher(args)
+        test_object = self.test_class(args)
         test_object.apply = Mock()
 
         test_object.run()
 
-        test_object.apply.assert_called_once_with('old', 'patch', 'old', None)
+        test_object.apply.assert_called_once_with('old', 'patch', 'old', None,
+                                                  'staging_dir')
 
     def test_check_euid_does_not_break_if_ignoring_euid(self):
         # Implicit: Does not throw error
-        patcher.XDelta3DirPatcher.check_euid(True)
+        self.test_class.check_euid(True)
 
     def test_check_euid_does_not_break_if_not_ignoring_euid_and_euid_is_0(self):
         mock_method = Mock(return_value = 0)
         # Implicit: Does not throw error
-        patcher.XDelta3DirPatcher.check_euid(False, mock_method)
+        self.test_class.check_euid(False, mock_method)
 
     def test_check_euid_breaks_if_not_ignoring_euid_and_euid_is_not_0(self):
         mock_method = Mock(return_value = 123)
         try:
-            patcher.XDelta3DirPatcher.check_euid(False, mock_method)
+            self.test_class.check_euid(False, mock_method)
         except:
             # Expected exception
             pass
@@ -462,7 +511,8 @@ class TestXDelta3DirPatcher(unittest.TestCase):
                 self.assertTrue(target_file.startswith(staging_dir))
 
                 # passthrough since other methods depend on actual output
-                patcher.XDelta3Impl().diff(old_file, new_file, target_file, debug)
+                self.xdelta_test_class().diff(old_file, new_file, target_file,
+                                              debug)
 
         args = patcher.AttributeDict()
         args.action = 'diff'
@@ -474,7 +524,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         args.target_dir = target_dir
         args.staging_dir = staging_dir
 
-        patcher.XDelta3DirPatcher(args, delta_impl = MockXDImplStagingTest).run()
+        self.test_class(args, delta_impl = MockXDImplStagingTest).run()
 
     # ------------------- XDeltaImpl tests
     def test_xdelta_impl_run_command_invokes_the_command(self):
@@ -482,46 +532,65 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         pass
 
     def test_xdelta_impl_diff_uses_correct_system_arguments(self):
-        test_class = patcher.XDelta3Impl
-        original_run_command = test_class.run_command
-        test_class.run_command = Mock()
+        original_run_command = self.xdelta_test_class.run_command
+        self.xdelta_test_class.run_command = Mock()
 
-        test_class.diff("old", "new", "target")
+        self.xdelta_test_class.diff("old", "new", "target")
 
-        test_class.run_command.assert_called_once_with(['xdelta3', '-f', '-e', '-s', 'old', 'new', 'target'])
+        self.xdelta_test_class.run_command \
+                              .assert_called_once_with(['xdelta3',
+                                                        '-f',
+                                                        '-e',
+                                                        '-s',
+                                                        'old',
+                                                        'new',
+                                                        'target'])
 
-        test_class.run_command = original_run_command
+        self.xdelta_test_class.run_command = original_run_command
 
     def test_xdelta_impl_diff_uses_correct_system_arguments_when_old_file_is_not_there(self):
-        test_class = patcher.XDelta3Impl
-        original_run_command = test_class.run_command
-        test_class.run_command = Mock()
+        original_run_command = self.xdelta_test_class.run_command
+        self.xdelta_test_class.run_command = Mock()
 
-        test_class.diff(None, "new", "target")
+        self.xdelta_test_class.diff(None, "new", "target")
 
-        test_class.run_command.assert_called_once_with(['xdelta3', '-f', '-e', 'new', 'target'])
+        self.xdelta_test_class.run_command \
+                              .assert_called_once_with(['xdelta3',
+                                                        '-f',
+                                                        '-e',
+                                                        'new',
+                                                        'target'])
 
-        test_class.run_command = original_run_command
+        self.xdelta_test_class.run_command = original_run_command
 
     def test_xdelta_impl_apply_uses_correct_system_arguments(self):
-        test_class = patcher.XDelta3Impl
-        original_run_command = test_class.run_command
-        test_class.run_command = Mock()
+        original_run_command = self.xdelta_test_class.run_command
+        self.xdelta_test_class.run_command = Mock()
 
-        test_class.apply("old", "patch", "target", None)
+        self.xdelta_test_class.apply("old", "patch", "target", None)
 
-        test_class.run_command.assert_called_once_with(['xdelta3', '-f', '-d', '-s', 'old', 'patch', 'target'])
+        self.xdelta_test_class.run_command \
+                              .assert_called_once_with(['xdelta3',
+                                                        '-f',
+                                                        '-d',
+                                                        '-s',
+                                                        'old',
+                                                        'patch',
+                                                        'target'])
 
-        test_class.run_command = original_run_command
+        self.xdelta_test_class.run_command = original_run_command
 
     def test_xdelta_impl_apply_uses_correct_system_arguments_when_old_file_is_not_there(self):
-        test_class = patcher.XDelta3Impl
-        original_run_command = test_class.run_command
-        test_class.run_command = Mock()
+        original_run_command = self.xdelta_test_class.run_command
+        self.xdelta_test_class.run_command = Mock()
 
-        test_class.apply(None, "patch", "target", None)
+        self.xdelta_test_class.apply(None, "patch", "target", None)
 
-        test_class.run_command.assert_called_once_with(['xdelta3', '-f', '-d', 'patch', 'target'])
+        self.xdelta_test_class.run_command \
+                              .assert_called_once_with(['xdelta3',
+                                                        '-f',
+                                                        '-d',
+                                                        'patch',
+                                                        'target'])
 
-        test_class.run_command = original_run_command
-
+        self.xdelta_test_class.run_command = original_run_command
