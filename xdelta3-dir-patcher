@@ -35,7 +35,10 @@ from tempfile import mkdtemp
 from subprocess import check_output, STDOUT
 from shutil import copymode, copystat, copyfile, copy2, rmtree, copytree
 from os import chmod, chown, cpu_count, geteuid, listdir, makedirs, mkdir
-from os import path, readlink, remove, rmdir, symlink, sep, stat, walk
+from os import O_NOFOLLOW, O_RDONLY, path, readlink, remove, rmdir, symlink, sep
+from os import stat, walk
+
+from os import open as os_open #Prevent mangling the regular open()
 
 VERSION='0.6'
 
@@ -301,8 +304,8 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
 
     def create(self, base_dir):
         for item in listdir(base_dir):
-            full_path = path.join(base_dir, item)
-            self.archive_object.add(full_path, item)
+            item_path = path.join(base_dir, item)
+            self.archive_object.add(item_path, item)
 
 class XDelta3ZipImpl(XDelta3AbstractArchiveImpl):
     def __init__(self, archive_path, for_writing = False):

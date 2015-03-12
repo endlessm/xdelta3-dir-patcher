@@ -21,12 +21,13 @@
 import imp
 import unittest
 
-from filecmp import dircmp, cmpfiles
 from mock import Mock
 from shutil import rmtree, copyfile, copytree
 from tempfile import mkdtemp
 from os import path, chmod, makedirs, walk
 from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH
+
+from .test_helpers import TestHelpers
 
 # Dashes are standard for exec scipts but not allowed for modules in Python. We
 # use the script standard since we will be running that file as a script most
@@ -47,35 +48,6 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
     def tearDown(self):
         rmtree(self.temp_dir)
         rmtree(self.temp_dir2)
-
-    # Helpers
-    def compare_trees(self, first, second):
-        diff = dircmp(first, second)
-
-        self.assertEquals([], diff.diff_files)
-        self.assertEquals([], diff.common_funny)
-        self.assertEquals([], diff.left_only)
-        self.assertEquals([], diff.right_only)
-
-        files_to_compare = []
-        for root, directories, files in walk(first):
-            for cmp_file in files:
-                files_to_compare.append(path.join(root, cmp_file))
-
-        # Strip target file prefixes
-        files_to_compare = [name[len(first)+1:] for name in files_to_compare]
-
-        _, mismatch, error = cmpfiles(first, second, files_to_compare)
-
-        self.assertEquals([], mismatch)
-        self.assertEquals([], error)
-
-    def get_content(self, filename):
-        content = None
-        with open(filename, 'rb') as file_handle:
-            content = file_handle.read()
-
-        return content
 
     def get_archive(self, name):
         return path.join(self.TEST_FILE_PREFIX, '%s' % name)
@@ -143,7 +115,7 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
 
         with self.test_class(archive) as test_object:
             test_object.expand('new folder/new file1.txt', self.temp_dir)
-            actual_content = self.get_content(path.join(self.temp_dir,
+            actual_content = TestHelpers.get_content(path.join(self.temp_dir,
                                                         'new folder',
                                                         'new file1.txt'))
 
@@ -165,9 +137,9 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
         test_object = self.test_class(archive)
 
         test_object.expand('new folder/new file1.txt', self.temp_dir)
-        actual_content = self.get_content(path.join(self.temp_dir,
-                                                    'new folder',
-                                                    'new file1.txt'))
+        actual_content = TestHelpers.get_content(path.join(self.temp_dir,
+                                                           'new folder',
+                                                           'new file1.txt'))
 
         self.assertEquals(b'new file content\n', actual_content)
 
@@ -194,4 +166,4 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
 
         # Since it's a FS implamantation, we compare it directly to our source
         # files
-        self.compare_trees(source_dir, archive)
+        TestHelpers.compare_trees(self, source_dir, archive)

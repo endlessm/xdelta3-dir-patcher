@@ -28,6 +28,8 @@ from tempfile import mkdtemp
 from os import path, remove, walk, chmod
 from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH
 
+from .test_helpers import TestHelpers
+
 # Dashes are standard for exec scipts but not allowed for modules in Python. We
 # use the script standard since we will be running that file as a script most
 # often.
@@ -50,35 +52,6 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         rmtree(self.temp_dir)
         rmtree(self.temp_dir2)
 
-    # Helpers
-    def compare_trees(self, first, second):
-        diff = dircmp(first, second)
-
-        self.assertEquals([], diff.diff_files)
-        self.assertEquals([], diff.common_funny)
-        self.assertEquals([], diff.left_only)
-        self.assertEquals([], diff.right_only)
-
-        files_to_compare = []
-        for root, directories, files in walk(first):
-            for cmp_file in files:
-                files_to_compare.append(path.join(root, cmp_file))
-
-        # Strip target file prefixes
-        files_to_compare = [name[len(first)+1:] for name in files_to_compare]
-
-        _, mismatch, error = cmpfiles(first, second, files_to_compare)
-
-        self.assertEquals([], mismatch)
-        self.assertEquals([], error)
-
-    def get_content(self, filename):
-        content = None
-        with open(filename, 'rb') as file_handle:
-            content = file_handle.read()
-
-        return content
-
     def get_file_from_archive(self, archive, name):
         with tarfile.open(archive, 'r:gz') as archive_file:
             named_member = archive_file.getmember(name)
@@ -100,7 +73,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
 
-        self.compare_trees(self.temp_dir, new_path)
+        TestHelpers.compare_trees(self, self.temp_dir, new_path)
 
     def test_apply_patch_works_with_root_dir_specified(self):
         old_path = path.join(self.TEST_FILE_PREFIX, 'old_version1')
@@ -116,7 +89,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
 
-        self.compare_trees(self.temp_dir, new_path)
+        TestHelpers.compare_trees(self, self.temp_dir, new_path)
 
 
     def test_apply_patch_creates_target_dir(self):
@@ -131,7 +104,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
 
-        self.compare_trees(self.temp_dir, new_path)
+        TestHelpers.compare_trees(self, self.temp_dir, new_path)
 
     def test_apply_patch_works_with_old_files_present_in_target(self):
         old_path = path.join(self.TEST_FILE_PREFIX, 'old_version1')
@@ -146,7 +119,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
                                "--ignore-euid"] )
 
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
-        self.compare_trees(self.temp_dir, new_path)
+        TestHelpers.compare_trees(self, self.temp_dir, new_path)
 
     def test_apply_patch_works_with_old_files_present_in_target_with_root_patch_dir(self):
         old_path = path.join(self.TEST_FILE_PREFIX, 'old_version1')
@@ -164,7 +137,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
                                "--ignore-euid"] )
 
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
-        self.compare_trees(self.temp_dir, new_path)
+        TestHelpers.compare_trees(self, self.temp_dir, new_path)
 
     def test_apply_works_with_symbolic_links_present(self):
         old_path = path.join(self.TEST_FILE_PREFIX, 'old_version_symlinks1')
@@ -175,7 +148,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
                       "--ignore-euid"] )
 
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version_symlinks1')
-        self.compare_trees(self.temp_dir, new_path)
+        TestHelpers.compare_trees(self, self.temp_dir, new_path)
 
     def test_diff_works(self):
         # Implicit dependency on previous apply integration test
@@ -190,7 +163,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
                       self.temp_dir,
                       "--ignore-euid"] )
 
-        self.compare_trees(self.temp_dir, new_path)
+        TestHelpers.compare_trees(self, self.temp_dir, new_path)
 
     def test_diff_works_with_both_files_as_arguments(self):
         # Implicit dependency on apply integration test
@@ -207,7 +180,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
                       self.temp_dir,
                       "--ignore-euid"] )
 
-        self.compare_trees(self.temp_dir, new_path)
+        TestHelpers.compare_trees(self, self.temp_dir, new_path)
 
     def test_diff_adds_the_metadata_file(self):
         # Implicit dependency on apply integration test
@@ -228,7 +201,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
         metadata = self.get_file_from_archive(generated_delta_path, '.info')
 
-        self.assertEquals(self.get_content(metadata_path), metadata)
+        self.assertEquals(TestHelpers.get_content(metadata_path), metadata)
 
     def test_diff_works_with_staging_directory_set(self):
         # Implicit dependency on apply integration test
@@ -255,7 +228,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
                       self.temp_dir,
                       "--ignore-euid"] )
 
-        self.compare_trees(self.temp_dir, new_path)
+        TestHelpers.compare_trees(self, self.temp_dir, new_path)
 
     def test_diff_works_with_old_file_as_arguments(self):
         # Implicit dependency on apply integration test
@@ -271,7 +244,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
                       self.temp_dir,
                       "--ignore-euid"] )
 
-        self.compare_trees(self.temp_dir, new_path)
+        TestHelpers.compare_trees(self, self.temp_dir, new_path)
 
     def test_diff_works_with_new_file_as_arguments(self):
         # Implicit dependency on apply integration test
@@ -287,7 +260,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
                       self.temp_dir,
                       "--ignore-euid"] )
 
-        self.compare_trees(self.temp_dir, new_path)
+        TestHelpers.compare_trees(self, self.temp_dir, new_path)
 
     def test_diff_works_with_symbolic_links_present(self):
         # Implicit dependency on previous apply integration test
@@ -303,7 +276,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
                       self.temp_dir,
                       "--ignore-euid"] )
 
-        self.compare_trees(self.temp_dir, new_path)
+        TestHelpers.compare_trees(self, self.temp_dir, new_path)
 
     # Integration tests
     def test_version_is_correct(self):

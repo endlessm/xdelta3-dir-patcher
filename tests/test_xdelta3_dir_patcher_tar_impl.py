@@ -20,12 +20,13 @@ import imp
 import unittest
 import tarfile
 
-from filecmp import dircmp, cmpfiles
 from mock import Mock
 from shutil import rmtree, copyfile
 from tempfile import mkdtemp
-from os import cpu_count, path, chmod, makedirs, walk, remove
+from os import cpu_count, listdir, path, chmod, makedirs, walk, remove
 from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH
+
+from .test_helpers import TestHelpers
 
 # Dashes are standard for exec scipts but not allowed for modules in Python. We
 # use the script standard since we will be running that file as a script most
@@ -46,35 +47,6 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
     def tearDown(self):
         rmtree(self.temp_dir)
         rmtree(self.temp_dir2)
-
-    # Helpers
-    def compare_trees(self, first, second):
-        diff = dircmp(first, second)
-
-        self.assertEquals([], diff.diff_files)
-        self.assertEquals([], diff.common_funny)
-        self.assertEquals([], diff.left_only)
-        self.assertEquals([], diff.right_only)
-
-        files_to_compare = []
-        for root, directories, files in walk(first):
-            for cmp_file in files:
-                files_to_compare.append(path.join(root, cmp_file))
-
-        # Strip target file prefixes
-        files_to_compare = [name[len(first)+1:] for name in files_to_compare]
-
-        _, mismatch, error = cmpfiles(first, second, files_to_compare)
-
-        self.assertEquals([], mismatch)
-        self.assertEquals([], error)
-
-    def get_content(self, filename):
-        content = None
-        with open(filename, 'rb') as file_handle:
-            content = file_handle.read()
-
-        return content
 
     def get_archive(self, name):
         return path.join(self.TEST_FILE_PREFIX, '%s.tgz' % name)
@@ -136,9 +108,9 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
 
         with self.test_class(archive) as test_object:
             test_object.expand('new folder/new file1.txt', self.temp_dir)
-            actual_content = self.get_content(path.join(self.temp_dir,
-                                                        'new folder',
-                                                        'new file1.txt'))
+            actual_content = TestHelpers.get_content(path.join(self.temp_dir,
+                                                               'new folder',
+                                                               'new file1.txt'))
 
             self.assertEquals(b'new file content\n', actual_content)
 
@@ -148,9 +120,9 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
         test_object = self.test_class(archive)
 
         test_object.expand('new folder/new file1.txt', self.temp_dir)
-        actual_content = self.get_content(path.join(self.temp_dir,
-                                                    'new folder',
-                                                    'new file1.txt'))
+        actual_content = TestHelpers.get_content(path.join(self.temp_dir,
+                                                           'new folder',
+                                                           'new file1.txt'))
 
         self.assertEquals(b'new file content\n', actual_content)
 
@@ -193,7 +165,21 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
         with tarfile.open(archive) as archive_object:
             archive_object.extractall(self.temp_dir2)
 
-        self.compare_trees(source_dir, self.temp_dir2)
+        TestHelpers.compare_trees(self, source_dir, self.temp_dir2)
+
+    def test_symbolic_links_are_handled_correctly(self):
+        archive = path.join(self.temp_dir, 'test_archive.tgz')
+
+        source_dir = path.join(self.TEST_FILE_PREFIX, 'symlink')
+
+        with self.test_class(archive, True) as test_object:
+            # Add the files to archive
+            test_object.create(source_dir)
+
+        with tarfile.open(archive) as archive_object:
+            archive_object.extractall(self.temp_dir2)
+
+        TestHelpers.compare_trees(self, source_dir, self.temp_dir2)
 
     # XXX: tarfile implementation is not thread-safe after trying it out
     @unittest.skipIf(cpu_count() <= 3, \
