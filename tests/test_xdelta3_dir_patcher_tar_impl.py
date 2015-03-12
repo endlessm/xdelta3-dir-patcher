@@ -176,8 +176,9 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
             # Add the files to archive
             test_object.create(source_dir)
 
-        with tarfile.open(archive) as archive_object:
-            archive_object.extractall(self.temp_dir2)
+        with self.test_class(archive) as test_object:
+            for item in test_object.list_files():
+                test_object.expand(item, self.temp_dir2)
 
         TestHelpers.compare_trees(self, source_dir, self.temp_dir2)
 

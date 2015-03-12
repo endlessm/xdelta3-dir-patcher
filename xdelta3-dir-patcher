@@ -548,9 +548,6 @@ class XDelta3DirPatcher(object):
             old_archive_obj.list_files()
 
             for filename in new_archive_obj.list_files():
-                if filename.endswith('/'):
-                    continue
-
                 if self.args.debug:
                     print('Processing %s' % filename)
                 else:
