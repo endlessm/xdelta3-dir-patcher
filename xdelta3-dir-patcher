@@ -118,17 +118,6 @@ class XDelta3AbstractArchiveImpl(object):
     def __init__(self):
         self.lock = threading.RLock()
 
-    def _safe_makedirs(self, dir_path):
-        try:
-            # FIXME: Copy all permissions for these if needed
-            makedirs(dir_path)
-        # Concurrency problems need to be handled. If two threads create
-        # the same dir, there might be a race between them checking and
-        # doing makedirs so we handle that "gracefully" here.
-        except FileExistsError as fee:
-            if not path.isdir(dir_path):
-                raise fee
-
     def _acquire_lock(self):
         self.lock.acquire()
 
@@ -190,19 +179,19 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
 
         if not target_path.endswith(path.sep):
             dir_path = path.dirname(target_path)
-            super()._safe_makedirs(dir_path)
+            makedirs(dir_path, exist_ok = True)
 
             copy2(path.join(self.path, filename), target_path,
-                  follow_symlinks=False)
+                  follow_symlinks = False)
         else:
-            super()._safe_makedirs(target_path)
+            makedirs(target_path, exist_ok = True)
 
     def create(self, base_dir):
         if path.isdir(self.path):
             raise Exception('Error! Archive already present!')
 
         copytree(base_dir, self.path,
-                 ignore_dangling_symlinks=False)
+                 ignore_dangling_symlinks = False)
 
 class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
     TAR_FORMAT = 'gz'
@@ -276,11 +265,11 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
                 folder_path = path.join(extraction_path,
                                         filename)
 
-                super()._safe_makedirs(folder_path)
+                makedirs(folder_path, exist_ok = True)
 
                 return
 
-        super()._safe_makedirs(extraction_path)
+        makedirs(extraction_path, exist_ok = True)
 
         # XXX: Not thread safe http://bugs.python.org/issue23649
         try:
@@ -355,7 +344,7 @@ class XDelta3ZipImpl(XDelta3AbstractArchiveImpl):
         return self.items
 
     def expand(self, filename, extraction_path):
-        super()._safe_makedirs(extraction_path)
+        makedirs(extraction_path, exist_ok = True)
 
         self.archive_object.extract(filename, extraction_path)
 
@@ -432,17 +421,6 @@ class XDelta3DirPatcher(object):
         chown(dest_file,uid,gid)
 
     @staticmethod
-    def _safe_makedirs(dir_path):
-        try:
-            makedirs(dir_path)
-        # Concurrency problems need to be handled. If two threads create
-        # the same dir, there might be a race between them checking and
-        # doing makedirs so we handle that "gracefully" here.
-        except FileExistsError as fee:
-            if not path.isdir(dir_path):
-                raise fee
-
-    @staticmethod
     def _get_temp_dir(staging_dir, prefix):
         temp_dir = None
         if staging_dir:
@@ -477,7 +455,7 @@ class XDelta3DirPatcher(object):
         target_path = path.join(target_root, filename)
 
         target_dir = path.dirname(target_path)
-        XDelta3DirPatcher._safe_makedirs(target_dir)
+        makedirs(target_dir, exist_ok = True)
 
         if self.args.debug: print([old_path, new_path, target_path])
 
@@ -532,7 +510,7 @@ class XDelta3DirPatcher(object):
             if args.debug: print("symlink: ", [target_path, patch_dst])
 
         elif path.isdir(patch_path):
-            self._safe_makedirs(target_path)
+            makedirs(target_path, exist_ok = True)
             self.copy_attributes(patch_path, target_path)
 
         else:
