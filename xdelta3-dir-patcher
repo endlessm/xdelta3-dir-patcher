@@ -35,7 +35,7 @@ from tempfile import mkdtemp
 from subprocess import check_output, STDOUT
 from shutil import copymode, copystat, copyfile, copy2, rmtree, copytree
 from os import chmod, chown, cpu_count, geteuid, listdir, makedirs, mkdir
-from os import path, readlink, remove, symlink, sep, stat, walk
+from os import path, readlink, remove, rmdir, symlink, sep, stat, walk
 
 VERSION='0.6'
 
@@ -86,6 +86,10 @@ class ExecutorRunner(object):
         # Leftover runners might have again clobbered the output
         self._fix_terminal()
 
+        # XXX: If nothig was ran, we might not have a start time
+        if not self.start_time:
+            self.start_time = time.time()
+
         print('Runner time: %.2fs' % (time.time() - self.start_time))
 
 # ---------------------------- ARCHIVE ADAPTERS ----------------------------
@@ -109,7 +113,7 @@ class XDeltaArchive(object):
 
 class XDelta3AbstractArchiveImpl(object):
     def __init__(self):
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
 
     def _safe_makedirs(self, dir_path):
         try:
@@ -275,10 +279,25 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
 
         super()._safe_makedirs(extraction_path)
 
-        # XXX: Not thread safe
-        super()._acquire_lock()
-        self.archive_object.extract(member, extraction_path)
-        super()._release_lock()
+        # XXX: Not thread safe http://bugs.python.org/issue23649
+        try:
+            super()._acquire_lock()
+
+            self.archive_object.extract(member, extraction_path)
+
+            super()._release_lock()
+        except FileExistsError as fee:
+            # XXX tarfile also might have thread issues even with the lock
+            #     in place so if we get errors as reported on the bugtracker
+            #     (http://bugs.python.org/issue23649) we try to re-run the task.
+            # TODO: Test this (somehow)
+            super()._release_lock()
+
+            self.expand(filename, extraction_path)
+        except Exception as e:
+            super()._release_lock()
+
+            raise(e)
 
     def create(self, base_dir):
         for item in listdir(base_dir):
@@ -363,7 +382,10 @@ class XDelta3Impl(object):
         command.append(new_file)
         command.append(target_file)
 
-        if debug: print("Generating xdelta: %s" % command)
+        if debug:
+            print("Generating xdelta: %s" % command)
+            stdout.flush()
+
         XDelta3Impl.run_command(command)
 
     # TODO: Test me
@@ -377,7 +399,10 @@ class XDelta3Impl(object):
         command.append(patch_file)
         command.append(target_file)
 
-        if debug: print("Applying xdelta: %s" % command)
+        if debug:
+            print("Applying xdelta: %s" % command)
+            stdout.flush()
+
         XDelta3Impl.run_command(command)
 
 # ---------------------------- MAIN CLASS ----------------------------
@@ -391,13 +416,13 @@ class XDelta3DirPatcher(object):
 
     # TODO: Unit test me
     def copy_attributes(self, src_file, dest_file):
-        if self.args.debug: print("Copying mode data")
+        if self.args.verbose: print("Copying mode data")
         copymode(src_file, dest_file)
 
-        if self.args.debug: print("Copying stat data (sans UID/GID)")
+        if self.args.verbose: print("Copying stat data (sans UID/GID)")
         copystat(src_file, dest_file)
 
-        if self.args.debug: print("Copying UID & GID")
+        if self.args.verbose: print("Copying UID & GID")
         uid = stat(src_file).st_uid
         gid = stat(src_file).st_gid
 
@@ -479,15 +504,22 @@ class XDelta3DirPatcher(object):
             if item and (path.isfile(item) or path.islink(item)):
                 remove(item)
 
-    def _apply_file_delta(self, rel_path, patch_file, old_root, patch_root, target_root):
-        print("Processing %s" % patch_file)
+    def _apply_file_delta(self, archive_object, patch_file, old_root,
+                          target_root,
+                          delta_patch_root,
+                          staging_dir):
+        if self.args.debug:
+            print("Processing %s" % patch_file)
+        else:
+            print('#', end = "")
+        stdout.flush()
 
-        if not path.isdir(target_root):
-            makedirs(target_root)
+        archive_object.expand(patch_file, staging_dir)
 
-        old_path = path.join(old_root, rel_path, patch_file)
-        patch_path = path.join(patch_root, rel_path, patch_file)
-        target_path = path.join(target_root, rel_path, patch_file)
+        rel_path = path.relpath(patch_file, delta_patch_root)
+        old_path = path.join(old_root, rel_path)
+        patch_path = path.join(staging_dir, patch_file)
+        target_path = path.join(target_root, rel_path)
 
         if args.debug: print([old_path, patch_path, target_path])
 
@@ -497,8 +529,7 @@ class XDelta3DirPatcher(object):
             if args.debug: print("symlink: ", [target_path, patch_dst])
 
         elif path.isdir(patch_path):
-            if not path.isdir(target_path):
-                makedirs(target_path)
+            self._safe_makedirs(target_path)
             self.copy_attributes(patch_path, target_path)
 
         else:
@@ -510,6 +541,8 @@ class XDelta3DirPatcher(object):
             self.delta_impl.apply(old_path, patch_path, target_path, self.args.debug)
 
             self.copy_attributes(patch_path, target_path)
+
+            remove(patch_path)
 
     # TODO: Unit test me
     def diff(self, old_dir, new_dir, patch_bundle, metadata = None,
@@ -538,7 +571,7 @@ class XDelta3DirPatcher(object):
                     continue
 
                 if self.args.debug:
-                    print('Expanding %s' % filename)
+                    print('Processing %s' % filename)
                 else:
                     print('.', end = "")
 
@@ -570,42 +603,56 @@ class XDelta3DirPatcher(object):
 
         print("Done")
 
-    def remove_deleted_items(self, target_dir, diff):
-        deleted_items = diff.right_only
+    # XXX This implementation requires directories passed in to be
+    #     empty. Callers are required to send in files first if they
+    #     expect a mixture of dirs/files of the same path.
+    @staticmethod
+    def remove_item(target_dir, deleted_item, debug = False, attempt = 0):
+        deleted_item_path = path.join(target_dir, deleted_item)
+        if debug:
+            print('Deleting %s' % deleted_item_path)
+        else:
+            print('X', end = "")
 
-        for deleted_item in deleted_items:
-            deleted_item_path = path.join(target_dir, deleted_item)
-            if path.isdir(deleted_item_path):
-                rmtree(deleted_item_path)
-            else:
-                remove(deleted_item_path)
+        if not path.exists(deleted_item_path):
+            return
 
-            if self.args.debug: print("Deleted old path", deleted_file)
+        if path.isdir(deleted_item_path):
+            # XXX: Try again a couple of seconds if concurrent threads have
+            #      not removed the internal files within the directory yet and
+            #      raise the errors otherwise. The approach is a bit strange but
+            #      it allows us for multi-threaded removal, prevents usage of
+            #      rmtree, and will fail properly if it's a real OSError
+            try:
+                rmdir(deleted_item_path)
+            except OSError as ose:
+                if cpu_count() < 2 or attempt > 8:
+                    raise ose
 
-        for subdir, subdir_diff in zip(diff.common_dirs, diff.subdirs.values()):
-            print(subdir)
+                time.sleep(0.2)
 
-            self.remove_deleted_items(path.join(target_dir, subdir), subdir_diff)
+                attempt += 1
+                XDelta3DirPatcher.remove_item(target_dir, deleted_item, debug, attempt)
+        else:
+            remove(deleted_item_path)
 
     # TODO: Unit test me
     def apply(self, old_dir, patch_bundle, target_dir, root_patch_dir = None,
               staging_dir = None,
               runner = ExecutorRunner()):
-        # Create a temp dir
+        in_place_apply = old_dir == target_dir
+
         # TODO: Test me
-        patch_dir = self._get_temp_dir(staging_dir, 'delta_src')
-        print("Using %s as staging area" % patch_dir)
+        # Create a temp dir
+        patch_staging_dir = self._get_temp_dir(staging_dir, 'delta_expanded')
+        print("Using %s as staging area" % patch_staging_dir)
 
-        delta_patch_dir = path.join(patch_dir, self.PATCH_FOLDER)
-
-        # If we want to apply only a part of the xdelta files (or a specific dir)
-        if root_patch_dir:
-            delta_patch_dir = path.join(delta_patch_dir, root_patch_dir)
-
-        print("Extracting archive...")
-        with XDeltaArchive(patch_bundle) as archive_object:
-            for filename in archive_object.list_files():
-                archive_object.expand(filename, patch_dir)
+        # If we want to apply only a part of the xdelta files
+        # from withing the delta bundle xdelta/ folder
+        if not root_patch_dir:
+            delta_patch_root = self.PATCH_FOLDER
+        else:
+            delta_patch_root = path.join(self.PATCH_FOLDER, root_patch_dir)
 
         # Make target dir if we don't have one
         if not path.isdir(target_dir):
@@ -613,28 +660,69 @@ class XDelta3DirPatcher(object):
             print("  - Please ensure that the toplevel target dir has the correct permissions.")
             makedirs(target_dir)
 
-        print("Removing deleted files")
-        diff = dircmp(delta_patch_dir, target_dir, ignore = None)
-        self.remove_deleted_items(target_dir, diff)
+        print('Enumerating old files')
+        old_files = []
+        with XDeltaArchive(old_dir) as old_archive:
+            old_files = old_archive.list_files()
+        if self.args.verbose: print("Old: %s" % old_files)
 
-        print("Applying patches")
-        for root, patch_dirs, patch_files in walk(delta_patch_dir):
-            print("Entering directory", root)
+        print('Applying patches from %s' % patch_bundle)
+        with XDeltaArchive(patch_bundle) as patch_archive:
+            all_archive_items = patch_archive.list_files()
+            if self.args.verbose: print("All in patch: %s" % all_archive_items)
 
-            rel_path = path.relpath(root, delta_patch_dir)
+            patches = [p for p in all_archive_items if p.startswith(delta_patch_root)]
+            if self.args.verbose: print("Patches: %s" % patches)
 
-            if self.args.debug: print("- Subdirs:", patch_dirs)
-            if self.args.debug: print("- Files:", patch_files)
+            # XXX: We need to strip out the internal path prefix on the patches
+            #      to be able to compare the file lists and build a "to_remove"
+            #      array. The reason why we use len() vs path.relpath() is so that
+            #      we don't strip out the trailing path.sep() on directories that
+            #      relpath does automatically
+            files_in_patch = []
+            for filename in patches:
+                relative_filename = filename[len(delta_patch_root) + len(path.sep):]
+                files_in_patch.append(relative_filename)
 
-            for patch_dir1 in patch_dirs:
-                self._apply_file_delta(rel_path, patch_dir1, old_dir, delta_patch_dir, target_dir)
-            for patch_file in patch_files:
-                self._apply_file_delta(rel_path, patch_file, old_dir, delta_patch_dir, target_dir)
+            if self.args.verbose: print("In patch: %s" % files_in_patch)
 
-            print("Leaving directory", root)
+            removed_items = [f for f in old_files if f not in files_in_patch]
 
-        print("Cleaning up...")
-        rmtree(patch_dir)
+            # XXX: This is to ensure that we never try to remove a directory while
+            #      all of its children are in queue waiting for a thread (causing
+            #      a deadlock)
+            removed_items.sort(key=len, reverse=True)
+
+            if self.args.verbose: print("Removed: %s" % removed_items)
+
+            print("Removing deleted files")
+
+            for removed_item in removed_items:
+                if self.args.debug:
+                    print('Queueing deletion %s' % filename)
+                else:
+                    print('x', end = "")
+
+                runner.add_task(self.remove_item, (target_dir,
+                                                   removed_item,
+                                                   self.args.debug))
+
+            for patch in patches:
+                if self.args.debug:
+                    print('Queueing %s' % patch)
+                else:
+                    print('.', end = "")
+
+                runner.add_task(self._apply_file_delta, (patch_archive,
+                                                         patch,
+                                                         old_dir,
+                                                         target_dir,
+                                                         delta_patch_root,
+                                                         patch_staging_dir))
+            runner.join_all()
+
+        print("Cleaning up")
+        rmtree(patch_staging_dir)
 
         print("Done")
 
@@ -733,11 +821,18 @@ if __name__ == '__main__':
             help='Enable debugging output',
             action='store_true')
 
+    parser.add_argument('--verbose',
+            help='Enable extremely verbose debugging output',
+            action='store_true')
+
     parser.add_argument('--version',
             action='version',
             version='%(prog)s v' + VERSION)
 
     args = AttributeDict(vars(parser.parse_args()))
+
+    if args.verbose:
+        args.debug = True
 
     if args.action:
         XDelta3DirPatcher(args).run()

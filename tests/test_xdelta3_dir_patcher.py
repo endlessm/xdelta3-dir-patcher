@@ -106,6 +106,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         old_path = path.join(self.TEST_FILE_PREFIX, 'old_version1')
         delta_path = path.join(self.TEST_FILE_PREFIX, 'patch2.xdelta.tgz')
         output = check_output(["./%s" % self.EXECUTABLE,
+                               "--debug",
                                "apply",
                                "-d", "inner_dir",
                                old_path,
@@ -155,6 +156,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
         delta_path = path.join(self.TEST_FILE_PREFIX, 'patch2.xdelta.tgz')
         output = check_output(["./%s" % self.EXECUTABLE,
+                               "--debug",
                                "apply",
                                "-d", "inner_dir",
                                self.temp_dir,
@@ -517,6 +519,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         args = patcher.AttributeDict()
         args.action = 'diff'
         args.debug = True
+        args.verbose = True
         args.metadata = None
         args.old_version = old_bundle
         args.new_version = new_bundle
@@ -525,6 +528,50 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         args.staging_dir = staging_dir
 
         self.test_class(args, delta_impl = MockXDImplStagingTest).run()
+
+    def test_remove_deleted_items_works_correctly_on_empty_dirs(self):
+        old_path = path.join(self.TEST_FILE_PREFIX, 'nested_deletion')
+        rmtree(self.temp_dir)
+        copytree(old_path, self.temp_dir)
+
+        self.test_class.remove_item(self.temp_dir, 'empty_deleted_dir', True)
+
+        self.assertFalse(path.exists(path.join(self.temp_dir, 'empty_deleted_dir')))
+
+    def test_remove_deleted_items_works_correctly_on_files(self):
+        old_path = path.join(self.TEST_FILE_PREFIX, 'nested_deletion')
+        rmtree(self.temp_dir)
+        copytree(old_path, self.temp_dir)
+
+        deleted_path = path.join(self.temp_dir,
+                                 'deleted folder',
+                                 'deleted internal file1.txt')
+
+        self.test_class.remove_item(self.temp_dir,
+                                    deleted_path,
+                                    True)
+
+        self.assertFalse(path.exists(deleted_path))
+
+    def test_remove_deleted_items_fails_correctly_on_non_empty_dirs(self):
+        old_path = path.join(self.TEST_FILE_PREFIX, 'nested_deletion')
+        rmtree(self.temp_dir)
+        copytree(old_path, self.temp_dir)
+
+        deleted_path = path.join(self.temp_dir,
+                                 'updated folder')
+
+
+        try:
+            self.test_class.remove_item(self.temp_dir,
+                                        deleted_path,
+                                        True)
+
+            raise Exception('Did not throw expected exception')
+        except OSError as ose:
+            pass
+        except Exception as e:
+            raise e
 
     # ------------------- XDeltaImpl tests
     def test_xdelta_impl_run_command_invokes_the_command(self):

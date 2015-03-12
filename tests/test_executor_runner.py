@@ -52,6 +52,11 @@ class TestExecutorRunner(unittest.TestCase):
         self.assertIn((2, 'b'), values_ran)
         self.assertIn((3, 'c'), values_ran)
 
+    def test_if_nothing_was_ran_dont_crash_on_time_calc(self):
+        test_object = self.test_class()
+
+        # Implicit test - no exception
+        test_object.join_all()
 
     @unittest.skipIf(cpu_count() <= 3, \
                      'This test requires 3 or more virtal CPUs')
