@@ -24,8 +24,8 @@ import unittest
 from mock import Mock
 from shutil import rmtree, copyfile, copytree
 from tempfile import mkdtemp
-from os import path, chmod, makedirs, walk
-from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH
+from os import path, chmod, makedirs, walk, lstat
+from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH, S_IMODE
 
 from .test_helpers import TestHelpers
 
@@ -35,7 +35,11 @@ from .test_helpers import TestHelpers
 patcher = imp.load_source("xdelta3-dir-patcher", "xdelta3-dir-patcher")
 
 class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
+    ALLOW_PERMISSION_TESTS = True
+
     TEST_FILE_PREFIX = path.join('tests', 'test_files', 'fs_impl')
+    GENERIC_TEST_FILE_PREFIX = path.join('tests', 'test_files', 'dir_patcher')
+
 
     def setUp(self):
         self.temp_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
@@ -167,3 +171,58 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
         # Since it's a FS implamantation, we compare it directly to our source
         # files
         TestHelpers.compare_trees(self, source_dir, archive)
+
+    # ---------------------------- PERMISSIONS TESTS -----------------------------
+    # XXX: Since permissions aren't preserved in git nor are they creatable
+    #      in tests, it's not feasible to create robust run-anywhere tests
+    #      that can truly be run on any platform which is why these are
+    #      conditional based on a very special test environment and a folder
+    #      which has content matching tests/test_files/permissions_new.tgz
+    #      and permissions that match.
+
+    @unittest.skipUnless(ALLOW_PERMISSION_TESTS, 'Test platform unsupported')
+    def test_gid_and_uid_of_added_files_are_correct(self):
+        # No way to test this without root permissions
+        pass
+
+    @unittest.skipUnless(ALLOW_PERMISSION_TESTS, 'Test platform unsupported')
+    def test_permissions_of_added_files_are_correct(self):
+        archive = path.join(self.temp_dir, 'permissions_new')
+
+        expected_permissions = {
+                'file_group_change.txt': 0o777,
+                'file_permission_change.txt': 0o1625,
+                'folder_permission_change': 0o1725,
+                'folder_permission_change/inner_file_permission_change.txt': 0o1625,
+                }
+
+        source_dir = path.join(self.GENERIC_TEST_FILE_PREFIX, 'permissions_new')
+
+        with self.test_class(archive, True) as test_object:
+            test_object.create(source_dir)
+
+        checked_items = 0
+
+        def validate_permissions(obj_path, checked_items):
+            rel_path = path.relpath(obj_path, archive)
+
+            if not rel_path in expected_permissions:
+                return checked_items
+
+            print(rel_path)
+            permissions = oct(expected_permissions[rel_path])
+            real_permissions = oct(S_IMODE(lstat(obj_path).st_mode))
+            self.assertEquals(real_permissions, permissions)
+
+            return checked_items + 1
+
+        for root, directories, files in walk(archive):
+            for filename in files:
+                file_path = path.join(root, filename)
+                checked_items = validate_permissions(file_path, checked_items)
+
+            for directory in directories:
+                dir_path = path.join(root, directory)
+                checked_items = validate_permissions(dir_path, checked_items)
+
+        self.assertEquals(checked_items, len(expected_permissions))

@@ -23,8 +23,8 @@ import tarfile
 from mock import Mock
 from shutil import rmtree, copyfile
 from tempfile import mkdtemp
-from os import cpu_count, listdir, path, chmod, makedirs, walk, remove
-from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH
+from os import cpu_count, listdir, lstat, path, chmod, makedirs, walk, remove
+from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH, S_IMODE
 
 from .test_helpers import TestHelpers
 
@@ -34,7 +34,10 @@ from .test_helpers import TestHelpers
 patcher = imp.load_source("xdelta3-dir-patcher", "xdelta3-dir-patcher")
 
 class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
+    ALLOW_PERMISSION_TESTS = True
+
     TEST_FILE_PREFIX = path.join('tests', 'test_files', 'tar_impl')
+    GENERIC_TEST_FILE_PREFIX = path.join('tests', 'test_files', 'dir_patcher')
 
     def setUp(self):
         self.temp_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
@@ -200,3 +203,83 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
                                                   (member, self.temp_dir))
 
             self.executor_runner.join_all()
+
+    # ---------------------------- PERMISSIONS TESTS -----------------------------
+    # XXX: Since permissions aren't preserved in git nor are they creatable
+    #      in tests, it's not feasible to create robust run-anywhere tests
+    #      that can truly be run on any platform which is why these are
+    #      conditional based on a very special test environment and a folder
+    #      which has content matching tests/test_files/permissions_new.tgz
+    #      and permissions that match.
+
+    @unittest.skipUnless(ALLOW_PERMISSION_TESTS, 'Test platform unsupported')
+    def test_gid_and_uid_of_added_files_are_correct(self):
+        archive = path.join(self.temp_dir, 'permissions_new.tgz')
+
+        expected_permissions = {
+                'file_group_change.txt': ( None, 4321 ),
+                'file_owner_change.txt': ( 1234, None ),
+                'folder_group_change': ( None, 4321 ),
+                'folder_owner_change': ( 1234, None ),
+                'folder_group_change/inner_file_group_change.txt': ( None, 4321 ),
+                'folder_group_change/inner_file_owner_change.txt': ( 1234, None ),
+                'folder_group_change/inner_folder_group_change': ( None, 4321 ),
+                'folder_group_change/inner_folder_owner_change': ( 1234, None ),
+                }
+
+        source_dir = path.join(self.GENERIC_TEST_FILE_PREFIX, 'permissions_new')
+
+        with self.test_class(archive, True) as test_object:
+            test_object.create(source_dir)
+
+        checked_items = 0
+        with tarfile.open(archive) as archive_object:
+            for member in archive_object.getmembers():
+                if member.name in expected_permissions:
+                    # print('U: %d (%s)' % (member.uid, member.uname))
+                    # print('G: %d (%s)' % (member.gid, member.gname))
+
+                    checked_items += 1
+
+                    expected_uid, expected_gid = expected_permissions[member.name]
+                    if expected_uid:
+                        self.assertEquals(member.uid, expected_uid)
+                    if expected_gid:
+                        self.assertEquals(member.gid, expected_gid)
+                else:
+                    print(member.name)
+
+        self.assertEquals(checked_items, len(expected_permissions))
+
+    @unittest.skipUnless(ALLOW_PERMISSION_TESTS, 'Test platform unsupported')
+    def test_permissions_of_added_files_are_correct(self):
+        archive = path.join(self.temp_dir, 'permissions_new')
+
+        expected_permissions = {
+                'file_group_change.txt': 0o777,
+                'file_permission_change.txt': 0o1625,
+                'folder_permission_change': 0o1725,
+                'folder_permission_change/inner_file_permission_change.txt': 0o1625,
+                }
+
+        source_dir = path.join(self.GENERIC_TEST_FILE_PREFIX, 'permissions_new')
+
+        with self.test_class(archive, True) as test_object:
+            test_object.create(source_dir)
+
+        def validate_permissions(member):
+            permissions = expected_permissions[member.name]
+            print(path.join(source_dir, member.name))
+
+            real_permissions = S_IMODE(lstat(path.join(source_dir,
+                                                       member.name)).st_mode)
+            self.assertEquals(oct(real_permissions), oct(permissions))
+
+        checked_items = 0
+        with tarfile.open(archive) as archive_object:
+            for member in archive_object.getmembers():
+                if member.name in expected_permissions:
+                    validate_permissions(member)
+                    checked_items += 1
+
+        self.assertEquals(checked_items, len(expected_permissions))

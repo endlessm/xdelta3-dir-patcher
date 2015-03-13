@@ -72,6 +72,9 @@ class ExecutorRunner(object):
 
         self.futures.append(self.executor.submit(target_func, *target_func_args))
 
+        # XXX: For single-threaded debugging
+        # target_func(*target_func_args)
+
     def join_all(self):
         if self.debug:
             # Make sure that the terminal isn't in some strange state
@@ -89,7 +92,7 @@ class ExecutorRunner(object):
         # Leftover runners might have again clobbered the output
         self._fix_terminal()
 
-        # XXX: If nothig was ran, we might not have a start time
+        # XXX: If nothing was ran, we might not have a start time
         if not self.start_time:
             self.start_time = time.time()
 
@@ -125,7 +128,7 @@ class XDelta3AbstractArchiveImpl(object):
         self.lock.release()
 
 class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
-    def __init__(self, path):
+    def __init__(self, path, for_writing = False):
         super().__init__()
 
         self.path = path
@@ -176,15 +179,34 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
 
     def expand(self, filename, extraction_path):
         target_path = path.join(extraction_path, filename)
+        source_path = path.join(self.path, filename)
 
         if not target_path.endswith(path.sep):
             dir_path = path.dirname(target_path)
             makedirs(dir_path, exist_ok = True)
 
-            copy2(path.join(self.path, filename), target_path,
-                  follow_symlinks = False)
+            copy2(source_path, target_path, follow_symlinks = False)
         else:
             makedirs(target_path, exist_ok = True)
+
+            # TODO: Test me
+            # Ensure that permissions/ids are transferred along to the target
+            copymode(source_path, target_path)
+            copystat(source_path, target_path)
+
+            try:
+                uid = stat(source_path).st_uid
+                gid = stat(source_path).st_gid
+
+                chown(target_path,uid,gid)
+            except PermissionError as pe:
+                # XXX: We can't copy the uid/gid unless we're run as root
+                #      which means that in most cases we can't get that 
+                #      included in the diffs unless we add direct linkage
+                #      between archive<->archive to copy these values
+
+                # print('WARNING! Could not change uid/gid of', target_path)
+                pass
 
     def create(self, base_dir):
         if path.isdir(self.path):
@@ -257,13 +279,21 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
 
     def expand(self, filename, extraction_path):
         try:
-            member = self.archive_object.getmember(filename)
+            extraction_name = filename
+
+            # TODO: Test me
+            if filename.endswith(path.sep):
+                extraction_name = extraction_name.rstrip(path.sep)
+
+            member = self.archive_object.getmember(extraction_name)
         except KeyError as key_error:
             # Maybe we have a folder that was added to
-            # the filelist that isn't really ni the archive
+            # the filelist that isn't really not in the archive
             if filename.endswith(path.sep):
                 folder_path = path.join(extraction_path,
                                         filename)
+
+                print('Skiping', folder_path)
 
                 makedirs(folder_path, exist_ok = True)
 
@@ -408,13 +438,10 @@ class XDelta3DirPatcher(object):
 
     # TODO: Unit test me
     def copy_attributes(self, src_file, dest_file):
-        if self.args.verbose: print("Copying mode data")
+        if self.args.verbose: print("Copying file metadata:", dest_file)
         copymode(src_file, dest_file)
-
-        if self.args.verbose: print("Copying stat data (sans UID/GID)")
         copystat(src_file, dest_file)
 
-        if self.args.verbose: print("Copying UID & GID")
         uid = stat(src_file).st_uid
         gid = stat(src_file).st_gid
 
