@@ -5,22 +5,27 @@ This script is a tool for generating and applying recursive XDelta3 diffs from s
 
 ### Usage
 ```
-usage: xdelta3-dir-patcher [-h] [--debug] [--version] {apply,diff} ...
+usage: xdelta3-dir-patcher [-h] [-s [STAGING_DIR]] [--debug] [--verbose]
+                           [--version]
+                           {apply,diff} ...
 
-Creates and applies XDelta3-based directory diff tgz files
+Creates and applies XDelta3-based directory diff archive files
 
 positional arguments:
   {apply,diff}
-    apply       Apply a diff from a directory. See "apply -help" for more
-                options
-    diff        Generate a diff from a directory. See "diff -help" for more
-                options
+    apply               Apply a diff from a directory. See "apply -help" for
+                        more options
+    diff                Generate a diff from directories/files. See "diff
+                        -help" for more options
 
 optional arguments:
-  -h, --help    show this help message and exit
-  --debug       Enable debugging output
-  --version     show program's version number and exit
-
+  -h, --help            show this help message and exit
+  -s [STAGING_DIR], --staging-dir [STAGING_DIR]
+                        Use this directory for all staging output of this
+                        program. Defaults to /tmp.
+  --debug               Enable debugging output
+  --verbose             Enable extremely verbose debugging output
+  --version             show program's version number and exit
 ```
 
 ### License
