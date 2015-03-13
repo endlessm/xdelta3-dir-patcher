@@ -36,7 +36,7 @@ from subprocess import check_output, STDOUT
 from shutil import copymode, copystat, copyfile, copy2, rmtree, copytree
 from os import chmod, chown, cpu_count, geteuid, listdir, makedirs, mkdir
 from os import O_NOFOLLOW, O_RDONLY, path, readlink, remove, rmdir, symlink, sep
-from os import stat, walk
+from os import stat, utime, walk
 
 from os import open as os_open #Prevent mangling the regular open()
 
@@ -278,24 +278,35 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
         return self.items
 
     def expand(self, filename, extraction_path):
+        member = None
         try:
-            extraction_name = filename
-
-            # TODO: Test me
-            if filename.endswith(path.sep):
-                extraction_name = extraction_name.rstrip(path.sep)
-
-            member = self.archive_object.getmember(extraction_name)
+            member = self.archive_object.getmember(filename)
         except KeyError as key_error:
-            # Maybe we have a folder that was added to
-            # the filelist that isn't really not in the archive
             if filename.endswith(path.sep):
+                try:
+                    folder_member_name = filename.rstrip(path.sep)
+                    member = self.archive_object.getmember(folder_member_name)
+                    if not member.isdir():
+                        member = None
+                except KeyError as key_error:
+                    print('No folder. Assuming its added as a placeholder',
+                          filename)
+
                 folder_path = path.join(extraction_path,
-                                        filename)
-
-                print('Skiping', folder_path)
-
+                                       filename)
                 makedirs(folder_path, exist_ok = True)
+
+                # TODO: Test me
+                # If we have a folder in the archive, copy its
+                # permissions/stat/mode to the target (but don't expand it)
+                if member:
+                    chmod(folder_path, member.mode)
+                    utime(folder_path, (member.mtime, member.mtime))
+
+                    try:
+                        chown(folder_path, member.uid, member.gid)
+                    except PermissionError as pe:
+                        pass
 
                 return
 
