@@ -458,21 +458,6 @@ class XDelta3DirPatcher(object):
 
         chown(dest_file,uid,gid)
 
-    @staticmethod
-    def _get_temp_dir(staging_dir, prefix):
-        temp_dir = None
-        if staging_dir:
-            folder_name = '%s_%s' % (prefix, XDelta3DirPatcher.get_random_string())
-            temp_dir = path.join(staging_dir, folder_name)
-        else:
-            # Create a temp dir if one isn't specified
-            temp_dir = mkdtemp(prefix="%s_" % XDelta3DirPatcher.__name__)
-
-        if not path.isdir(temp_dir):
-            mkdir(temp_dir)
-
-        return temp_dir
-
     def _find_file_delta(self, filename, old_archive_obj, new_archive_obj,
                           old_root,
                           new_root,
@@ -567,7 +552,8 @@ class XDelta3DirPatcher(object):
     def diff(self, old_dir, new_dir, patch_bundle, metadata = None,
              staging_dir = None,
              runner = ExecutorRunner()):
-        target_dir = self._get_temp_dir(staging_dir, 'target')
+        target_dir = mkdtemp(prefix='%s_target' % XDelta3DirPatcher.__name__,
+                             dir=staging_dir)
 
         print("Using %s as staging area" % target_dir)
         stdout.flush()
@@ -578,8 +564,10 @@ class XDelta3DirPatcher(object):
 
         with XDeltaArchive(old_dir) as old_archive_obj, \
              XDeltaArchive(new_dir) as new_archive_obj:
-            old_staging_dir = self._get_temp_dir(staging_dir, 'old_src')
-            new_staging_dir = self._get_temp_dir(staging_dir, 'new_src')
+            old_staging_dir = mkdtemp(prefix='%s_old_src' % XDelta3DirPatcher.__name__,
+                                      dir=staging_dir)
+            new_staging_dir = mkdtemp(prefix='%s_new_src' % XDelta3DirPatcher.__name__,
+                                      dir=staging_dir)
 
             # XXX: Preload old archive file list to avoid concurrency issues
             # TODO: Make the listing thread-safe
@@ -660,7 +648,8 @@ class XDelta3DirPatcher(object):
 
         # TODO: Test me
         # Create a temp dir
-        patch_staging_dir = self._get_temp_dir(staging_dir, 'delta_expanded')
+        patch_staging_dir = mkdtemp(prefix='%s_delta_expanded' % XDelta3DirPatcher.__name__,
+                                    dir=staging_dir)
         print("Using %s as staging area" % patch_staging_dir)
 
         # If we want to apply only a part of the xdelta files
