@@ -393,7 +393,7 @@ class XDelta3ZipImpl(XDelta3AbstractArchiveImpl):
         for root, dirnames, filenames in walk(base_dir):
             for filename in filenames:
                 full_path = path.join(root, filename)
-                internal_path = full_path[len(base_dir) + 1:]
+                internal_path = path.relpath(full_path, base_dir)
 
                 self.archive_object.write(full_path, internal_path)
 
