@@ -1,3 +1,16 @@
+xdelta3-dir-patcher (0.4) unstable; urgency=medium
+
+  * Added ability to include a metadata file in the diffs
+
+ -- Srdjan Grubor <sgnn7@sgnn7.org>  Fri, 12 Dec 2014 16:16:33 -0600
+
+xdelta3-dir-patcher (0.3) unstable; urgency=medium
+
+  * Added ability to specify base dir within the xdelta blob
+    from where to use the diffs
+
+ -- Srdjan Grubor <sgnn7@sgnn7.org>  Thu, 11 Dec 2014 16:25:01 -0600
+
 xdelta3-dir-patcher (0.2-2) unstable; urgency=medium
 
   * There were problems with distributions without python3.2 available
