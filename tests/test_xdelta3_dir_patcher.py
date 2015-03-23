@@ -23,7 +23,7 @@ import tarfile
 from filecmp import dircmp, cmpfiles
 from mock import Mock
 from shutil import rmtree, copytree
-from subprocess import CalledProcessError, check_output, STDOUT
+from subprocess import CalledProcessError, STDOUT
 from tempfile import mkdtemp
 from os import path, remove, walk, chmod
 from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH
@@ -66,10 +66,13 @@ class TestXDelta3DirPatcher(unittest.TestCase):
     def test_apply_patch_works(self):
         old_path = path.join(self.TEST_FILE_PREFIX, 'old_version1')
         delta_path = path.join(self.TEST_FILE_PREFIX, 'patch1.xdelta.tgz')
-        output = check_output(["./%s" % self.EXECUTABLE, "apply", old_path,
-                               delta_path,
-                               self.temp_dir,
-                               "--ignore-euid"] )
+        output = TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                            "--debug",
+                                            "apply",
+                                            old_path,
+                                            delta_path,
+                                            self.temp_dir,
+                                            "--ignore-euid"] )
 
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
 
@@ -78,14 +81,14 @@ class TestXDelta3DirPatcher(unittest.TestCase):
     def test_apply_patch_works_with_root_dir_specified(self):
         old_path = path.join(self.TEST_FILE_PREFIX, 'old_version1')
         delta_path = path.join(self.TEST_FILE_PREFIX, 'patch2.xdelta.tgz')
-        output = check_output(["./%s" % self.EXECUTABLE,
-                               "--debug",
-                               "apply",
-                               "-d", "inner_dir",
-                               old_path,
-                               delta_path,
-                               self.temp_dir,
-                               "--ignore-euid"] )
+        output = TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                            "--debug",
+                                            "apply",
+                                            "-d", "inner_dir",
+                                            old_path,
+                                            delta_path,
+                                            self.temp_dir,
+                                            "--ignore-euid"])
 
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
 
@@ -97,10 +100,13 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         delta_path = path.join(self.TEST_FILE_PREFIX, 'patch1.xdelta.tgz')
 
         rmtree(self.temp_dir)
-        output = check_output(["./%s" % self.EXECUTABLE, "apply", old_path,
-                               delta_path,
-                               self.temp_dir,
-                               "--ignore-euid"] )
+        output = TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                            "--debug",
+                                            "apply",
+                                            old_path,
+                                            delta_path,
+                                            self.temp_dir,
+                                            "--ignore-euid"])
 
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
 
@@ -113,10 +119,12 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         copytree(old_path, self.temp_dir)
 
         delta_path = path.join(self.TEST_FILE_PREFIX, 'patch1.xdelta.tgz')
-        output = check_output(["./%s" % self.EXECUTABLE, "apply",
-                               self.temp_dir,
-                               delta_path,
-                               "--ignore-euid"] )
+        output = TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                            "--verbose",
+                                            "apply",
+                                            self.temp_dir,
+                                            delta_path,
+                                            "--ignore-euid"])
 
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
         TestHelpers.compare_trees(self, self.temp_dir, new_path)
@@ -128,13 +136,13 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         copytree(old_path, self.temp_dir)
 
         delta_path = path.join(self.TEST_FILE_PREFIX, 'patch2.xdelta.tgz')
-        output = check_output(["./%s" % self.EXECUTABLE,
-                               "--debug",
-                               "apply",
-                               "-d", "inner_dir",
-                               self.temp_dir,
-                               delta_path,
-                               "--ignore-euid"] )
+        output = TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                            "--debug",
+                                            "apply",
+                                            "-d", "inner_dir",
+                                            self.temp_dir,
+                                            delta_path,
+                                            "--ignore-euid"] )
 
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
         TestHelpers.compare_trees(self, self.temp_dir, new_path)
@@ -143,9 +151,13 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         old_path = path.join(self.TEST_FILE_PREFIX, 'old_version_symlinks1')
         delta_path = path.join(self.TEST_FILE_PREFIX, 'patch_symlinks1.xdelta.tgz')
 
-        check_output(["./%s" % self.EXECUTABLE, "apply", old_path, delta_path,
-                      self.temp_dir,
-                      "--ignore-euid"] )
+        output = TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                            "--debug",
+                                            "apply",
+                                            old_path,
+                                            delta_path,
+                                            self.temp_dir,
+                                            "--ignore-euid"])
 
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version_symlinks1')
         TestHelpers.compare_trees(self, self.temp_dir, new_path)
@@ -156,12 +168,20 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
         generated_delta_path = path.join(self.temp_dir2, 'patch.xdelta')
 
-        check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_path,
-                      generated_delta_path] )
-        check_output(["./%s" % self.EXECUTABLE, "apply", old_path,
-                      generated_delta_path,
-                      self.temp_dir,
-                      "--ignore-euid"] )
+        TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                   "--debug",
+                                   "diff",
+                                   old_path,
+                                   new_path,
+                                   generated_delta_path])
+
+        TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                   "--debug",
+                                   "apply",
+                                   old_path,
+                                   generated_delta_path,
+                                   self.temp_dir,
+                                   "--ignore-euid"])
 
         TestHelpers.compare_trees(self, self.temp_dir, new_path)
 
@@ -173,12 +193,20 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         new_bundle = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
         generated_delta_path = path.join(self.temp_dir2, 'patch.xdelta')
 
-        check_output(["./%s" % self.EXECUTABLE, "diff", old_bundle, new_bundle,
-                      generated_delta_path] )
-        check_output(["./%s" % self.EXECUTABLE, "apply", old_path,
-                      generated_delta_path,
-                      self.temp_dir,
-                      "--ignore-euid"] )
+        TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                   "--debug",
+                                   "diff",
+                                   old_bundle,
+                                   new_bundle,
+                                   generated_delta_path])
+
+        TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                   "--debug",
+                                   "apply",
+                                   old_path,
+                                   generated_delta_path,
+                                   self.temp_dir,
+                                   "--ignore-euid"])
 
         TestHelpers.compare_trees(self, self.temp_dir, new_path)
 
@@ -192,12 +220,13 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
         metadata_path = path.join(self.TEST_FILE_PREFIX, 'metadata1.txt')
 
-        check_output(["./%s" % self.EXECUTABLE,
-                      "diff",
-                      "--metadata", metadata_path,
-                      old_bundle,
-                      new_bundle,
-                      generated_delta_path] )
+        TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                   "--debug",
+                                   "diff",
+                                   "--metadata", metadata_path,
+                                   old_bundle,
+                                   new_bundle,
+                                   generated_delta_path])
 
         metadata = self.get_file_from_archive(generated_delta_path, '.info')
 
@@ -214,19 +243,23 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         staging_dir = mkdtemp(prefix="%s_" % self.__class__.__name__)
 
         try:
-            check_output(["./%s" % self.EXECUTABLE,
-                          "--staging-dir", staging_dir,
-                          "diff",
-                          old_bundle,
-                          new_bundle,
-                          generated_delta_path] )
+            TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                       "--debug",
+                                       "--staging-dir", staging_dir,
+                                       "diff",
+                                       old_bundle,
+                                       new_bundle,
+                                       generated_delta_path] )
         finally:
             rmtree(staging_dir)
 
-        check_output(["./%s" % self.EXECUTABLE, "apply", old_path,
-                      generated_delta_path,
-                      self.temp_dir,
-                      "--ignore-euid"] )
+        TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                   "--debug",
+                                   "apply",
+                                   old_path,
+                                   generated_delta_path,
+                                   self.temp_dir,
+                                   "--ignore-euid"] )
 
         TestHelpers.compare_trees(self, self.temp_dir, new_path)
 
@@ -237,12 +270,20 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
         generated_delta_path = path.join(self.temp_dir2, 'patch.xdelta')
 
-        check_output(["./%s" % self.EXECUTABLE, "diff", old_bundle, new_path,
-                      generated_delta_path] )
-        check_output(["./%s" % self.EXECUTABLE, "apply", old_path,
-                      generated_delta_path,
-                      self.temp_dir,
-                      "--ignore-euid"] )
+        TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                   "--debug",
+                                   "diff",
+                                   old_bundle,
+                                   new_path,
+                                   generated_delta_path])
+
+        TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                   "--debug",
+                                   "apply",
+                                   old_path,
+                                   generated_delta_path,
+                                   self.temp_dir,
+                                   "--ignore-euid"])
 
         TestHelpers.compare_trees(self, self.temp_dir, new_path)
 
@@ -253,12 +294,20 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         new_bundle = path.join(self.TEST_FILE_PREFIX, 'new_version1.tgz')
         generated_delta_path = path.join(self.temp_dir2, 'patch.xdelta')
 
-        check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_bundle,
-                      generated_delta_path] )
-        check_output(["./%s" % self.EXECUTABLE, "apply", old_path,
-                      generated_delta_path,
-                      self.temp_dir,
-                      "--ignore-euid"] )
+        TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                   "--debug",
+                                   "diff",
+                                   old_path,
+                                   new_bundle,
+                                   generated_delta_path])
+
+        TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                   "--debug",
+                                   "apply",
+                                   old_path,
+                                   generated_delta_path,
+                                   self.temp_dir,
+                                   "--ignore-euid"])
 
         TestHelpers.compare_trees(self, self.temp_dir, new_path)
 
@@ -269,60 +318,73 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
         generated_delta_path = path.join(self.temp_dir2, 'patch_symlinks.xdelta')
 
-        check_output(["./%s" % self.EXECUTABLE, "diff", old_path, new_path,
-                      generated_delta_path] )
-        check_output(["./%s" % self.EXECUTABLE, "apply", old_path,
-                      generated_delta_path,
-                      self.temp_dir,
-                      "--ignore-euid"] )
+        TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                   "--debug",
+                                   "diff",
+                                   old_path,
+                                   new_path,
+                                   generated_delta_path])
+
+        TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                   "--debug",
+                                   "apply",
+                                   old_path,
+                                   generated_delta_path,
+                                   self.temp_dir,
+                                   "--ignore-euid"])
 
         TestHelpers.compare_trees(self, self.temp_dir, new_path)
 
     # Integration tests
     def test_version_is_correct(self):
-        output = check_output(["./%s" % self.EXECUTABLE, '--version'],
-                              stderr=STDOUT,
-                              universal_newlines=True)
+        output = TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                            '--version'])
         self.assertEqual(output, "%s v0.6\n" % self.EXECUTABLE)
 
     def test_help_is_available(self):
-        self.assertIsNotNone(check_output(["./%s" % self.EXECUTABLE, '-h']))
-        self.assertIsNotNone(check_output(["./%s" % self.EXECUTABLE, '--help']))
+        self.assertIsNotNone(TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                                        '-h']))
+        self.assertIsNotNone(TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                                        '--help']))
 
     def test_debugging_is_available(self):
-        output = check_output(["./%s" % self.EXECUTABLE, '--debug'])
-        self.assertNotIn("unrecognized arguments", output.decode('utf-8'))
+        output = TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                            '--debug'])
+        self.assertNotIn("unrecognized arguments", output)
 
     def test_help_is_printed_if_no_action_command(self):
-        output = check_output(["./%s" % self.EXECUTABLE])
-        self.assertIn("usage: ", output.decode('utf-8'))
+        output = TestHelpers.check_output2(["./%s" % self.EXECUTABLE])
+        self.assertIn("usage: ", output)
 
     def test_apply_is_allowed_as_action_command(self):
         try:
-            check_output(["./%s" % self.EXECUTABLE, "apply"],
-                         stderr=STDOUT)
+            output = TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                                'apply'])
         except CalledProcessError as e:
-            self.assertIn("usage: ", e.output.decode('utf-8'))
-            self.assertNotIn("invalid choice: ", e.output.decode('utf-8'))
+            self.assertIn("usage: ", e.output)
+            self.assertNotIn("invalid choice: ", e.output)
         else: self.fail()
 
     def test_apply_usage_is_printed_if_not_enough_args(self):
         try:
-            check_output(["./%s" % self.EXECUTABLE, "apply"],
-                         stderr=STDOUT)
+            output = TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                                'apply'])
         except CalledProcessError as e:
             self.assertIn("the following arguments are required: ",
-                          e.output.decode('utf-8'))
+                          e.output)
         else: self.fail()
 
     def test_apply_usage_is_not_printed_if_args_are_correct(self):
         old_path = path.join(self.TEST_FILE_PREFIX, 'old_version1')
         delta_path = path.join(self.TEST_FILE_PREFIX, 'patch1.xdelta.tgz')
-        output = check_output(["./%s" % self.EXECUTABLE, "apply", old_path,
-                               delta_path,
-                               self.temp_dir,
-                               "--ignore-euid"] )
-        self.assertNotIn("usage: ", output.decode('utf-8'))
+        output = TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                            "apply",
+                                            old_path,
+                                            delta_path,
+                                            self.temp_dir,
+                                            "--ignore-euid"])
+
+        self.assertNotIn("usage: ", output)
 
     def test_apply_usage_is_not_printed_if_args_are_correct2(self):
         old_path = path.join(self.TEST_FILE_PREFIX, 'old_version1')
@@ -331,47 +393,52 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         copytree(old_path, self.temp_dir)
 
         delta_path = path.join(self.TEST_FILE_PREFIX, 'patch1.xdelta.tgz')
-        output = check_output(["./%s" % self.EXECUTABLE, "apply",
-                               self.temp_dir,
-                               delta_path,
-                               "--ignore-euid"] )
-        self.assertNotIn("usage: ",
-                         output.decode('utf-8'))
+        output = TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                            "apply",
+                                            self.temp_dir,
+                                            delta_path,
+                                            "--ignore-euid"])
+
+        self.assertNotIn("usage: ", output)
 
     def test_diff_usage_is_printed_if_not_enough_args(self):
         try:
-            check_output(["./%s" % self.EXECUTABLE, "diff"],
-                         stderr=STDOUT)
+            TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                       'diff'])
         except CalledProcessError as e:
             self.assertIn("the following arguments are required: ",
-                          e.output.decode ('utf-8'))
+                          e.output)
         else: self.fail()
 
     def test_diff_is_allowed_as_action_command(self):
         try:
-            check_output(["./%s" % self.EXECUTABLE, "diff"],
-                         stderr=STDOUT)
+            TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                       'diff'])
         except CalledProcessError as e:
-            self.assertIn("usage: ", e.output.decode('utf-8'))
-            self.assertNotIn("invalid choice: ", e.output.decode('utf-8'))
+            self.assertIn("usage: ", e.output)
+            self.assertNotIn("invalid choice: ", e.output)
         else: self.fail()
 
     def test_diff_usage_is_not_printed_if_args_are_correct(self):
         old_path = path.join(self.TEST_FILE_PREFIX, 'old_version1')
         new_path = path.join(self.TEST_FILE_PREFIX, 'new_version1')
         delta_path = path.join(self.temp_dir, 'foo.tgz')
-        output = check_output(["./%s" % self.EXECUTABLE, "diff", old_path,
-                               new_path,
-                               delta_path] )
-        self.assertNotIn("usage: ", output.decode('utf-8'))
+
+        output = TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                       'diff',
+                                       old_path,
+                                       new_path,
+                                       delta_path])
+
+        self.assertNotIn("usage: ", output)
 
     def test_other_actions_are_not_allowed(self):
         try:
-            check_output(["./%s" % self.EXECUTABLE, "foobar"],
-                         stderr=STDOUT)
+            TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
+                                       'foobar'])
         except CalledProcessError as e:
-            self.assertIn("usage: ", e.output.decode('utf-8'))
-            self.assertIn("invalid choice: ", e.output.decode('utf-8'))
+            self.assertIn("usage: ", e.output)
+            self.assertIn("invalid choice: ", e.output)
         else: self.fail()
 
     # Unit tests

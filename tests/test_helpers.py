@@ -1,5 +1,6 @@
 from filecmp import dircmp, cmpfiles
 from os import path, readlink, walk
+from subprocess import STDOUT, CalledProcessError, check_output
 
 class TestHelpers(object):
     # Helpers
@@ -43,3 +44,26 @@ class TestHelpers(object):
 
         return content
 
+
+    # This method should be almost the exact same as subprocess.check_output
+    # except that it will also print any errors that it encounters during the
+    # running of the program to help with debugging.
+    @staticmethod
+    def check_output2(command):
+        try:
+            print("Command:")
+            print("****")
+            print(' '.join(command))
+            print("****")
+
+            output = check_output(command, stderr = STDOUT,
+                                  universal_newlines = True);
+        except CalledProcessError as cpe:
+            print("FAIL:", cpe.returncode, cpe.output)
+
+            raise(cpe)
+        else:
+            print("Output:")
+            print(output)
+
+        return output

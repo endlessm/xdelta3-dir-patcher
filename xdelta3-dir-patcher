@@ -32,7 +32,7 @@ from stat import *
 from filecmp import dircmp
 from sys import stderr, stdout
 from tempfile import mkdtemp
-from subprocess import check_output, STDOUT
+from subprocess import check_output, STDOUT, CalledProcessError
 from shutil import copymode, copystat, copyfile, copy2, rmtree, copytree
 from os import chmod, chown, cpu_count, geteuid, listdir, makedirs, mkdir
 from os import O_NOFOLLOW, O_RDONLY, path, readlink, remove, rmdir, symlink, sep
@@ -289,8 +289,11 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
                     if not member.isdir():
                         member = None
                 except KeyError as key_error:
-                    print('No folder. Assuming its added as a placeholder',
-                          filename)
+                    # XXX: For now we don't care about showing this output
+                    #      to users
+                    # print('No folder. Assuming its added as a placeholder',
+                    #       filename)
+                    pass
 
                 folder_path = path.join(extraction_path,
                                        filename)
@@ -402,7 +405,27 @@ class XDelta3Impl(object):
     # TODO: Unit test me
     @staticmethod
     def run_command(args, exec_method = check_output):
-        exec_method(args, stderr=STDOUT)
+        try:
+            output = exec_method(args, stderr = STDOUT,
+                                 universal_newlines = True)
+        except CalledProcessError as cpe:
+            print()
+            print("XDELTA FAIL:", cpe.returncode, cpe.output)
+            print()
+
+            raise(cpe)
+
+    @staticmethod
+    def _print_command(prefix, command):
+        command_line = prefix
+        for arg in command:
+            if ' ' in arg:
+                command_line += ' \'' + arg + '\''
+            else:
+                command_line += ' ' + arg
+
+        print(command_line)
+        stdout.flush()
 
     # TODO: Test me
     @staticmethod
@@ -416,8 +439,7 @@ class XDelta3Impl(object):
         command.append(target_file)
 
         if debug:
-            print("Generating xdelta: %s" % command)
-            stdout.flush()
+            XDelta3Impl._print_command('XD Diff:', command)
 
         XDelta3Impl.run_command(command)
 
@@ -433,8 +455,7 @@ class XDelta3Impl(object):
         command.append(target_file)
 
         if debug:
-            print("Applying xdelta: %s" % command)
-            stdout.flush()
+            XDelta3Impl._print_command('XD Apply:', command)
 
         XDelta3Impl.run_command(command)
 
@@ -463,7 +484,7 @@ class XDelta3DirPatcher(object):
                           new_root,
                           target_root):
         if self.args.debug:
-            print("Processing %s" % filename)
+            print("Processing \'%s\'" % filename)
         else:
             print('#', end = "")
         stdout.flush()
@@ -480,7 +501,7 @@ class XDelta3DirPatcher(object):
         target_dir = path.dirname(target_path)
         makedirs(target_dir, exist_ok = True)
 
-        if self.args.debug: print([old_path, new_path, target_path])
+        if self.args.debug: print("Diff:", old_path, new_path, target_path)
 
         if path.islink(new_path):
             new_dst = readlink(new_path)
@@ -513,7 +534,7 @@ class XDelta3DirPatcher(object):
                           delta_patch_root,
                           staging_dir):
         if self.args.debug:
-            print("Processing %s" % patch_file)
+            print("Processing \'%s\'" % patch_file)
         else:
             print('#', end = "")
         stdout.flush()
@@ -525,7 +546,7 @@ class XDelta3DirPatcher(object):
         patch_path = path.join(staging_dir, patch_file)
         target_path = path.join(target_root, rel_path)
 
-        if args.debug: print([old_path, patch_path, target_path])
+        if args.debug: print("Apply:", old_path, patch_path, target_path)
 
         if path.islink(patch_path):
             patch_dst = readlink(patch_path)
@@ -575,7 +596,7 @@ class XDelta3DirPatcher(object):
 
             for filename in new_archive_obj.list_files():
                 if self.args.debug:
-                    print('Processing %s' % filename)
+                    print('Queueing \'%s\'' % filename)
                 else:
                     print('.', end = "")
 
@@ -614,7 +635,7 @@ class XDelta3DirPatcher(object):
     def remove_item(target_dir, deleted_item, debug = False, attempt = 0):
         deleted_item_path = path.join(target_dir, deleted_item)
         if debug:
-            print('Deleting %s' % deleted_item_path)
+            print('Deleting \'%s\'' % deleted_item_path)
         else:
             print('X', end = "")
 
@@ -704,7 +725,7 @@ class XDelta3DirPatcher(object):
 
             for removed_item in removed_items:
                 if self.args.debug:
-                    print('Queueing deletion %s' % filename)
+                    print('Queueing(rm) \'%s\'' % removed_item)
                 else:
                     print('x', end = "")
 
@@ -714,7 +735,7 @@ class XDelta3DirPatcher(object):
 
             for patch in patches:
                 if self.args.debug:
-                    print('Queueing %s' % patch)
+                    print('Queueing \'%s\'' % patch)
                 else:
                     print('.', end = "")
 
