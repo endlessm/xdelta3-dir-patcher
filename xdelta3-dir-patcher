@@ -178,12 +178,26 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
         return self.items
 
     def expand(self, filename, extraction_path):
-        target_path = path.join(extraction_path, filename)
         source_path = path.join(self.path, filename)
+        target_path = path.join(extraction_path, filename)
 
-        if not target_path.endswith(path.sep):
+        is_link = path.islink(path.abspath(source_path))
+        is_file = not target_path.endswith(path.sep)
+
+        if is_link:
+            source_path = path.abspath(source_path)
+            target_path = path.abspath(target_path)
+
             dir_path = path.dirname(target_path)
-            makedirs(dir_path, exist_ok = True)
+            if not path.exists(dir_path):
+                makedirs(dir_path, exist_ok = True)
+
+            link_target = readlink(source_path)
+            symlink(link_target, target_path)
+        elif is_file:
+            dir_path = path.dirname(target_path)
+            if not path.exists(dir_path):
+                makedirs(dir_path, exist_ok = True)
 
             copy2(source_path, target_path, follow_symlinks = False)
         else:
@@ -213,6 +227,7 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
             raise Exception('Error! Archive already present!')
 
         copytree(base_dir, self.path,
+                 symlinks = True,
                  ignore_dangling_symlinks = False)
 
 class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
@@ -283,57 +298,73 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
             member = self.archive_object.getmember(filename)
         except KeyError as key_error:
             if filename.endswith(path.sep):
+                # This is for folders that are returned by list_files which
+                # don't have a matching folder within the archive
+                ghost_entry = False
+                is_link = False
+
                 try:
                     folder_member_name = filename.rstrip(path.sep)
                     member = self.archive_object.getmember(folder_member_name)
-                    if not member.isdir():
-                        member = None
+
+                    if member.islnk():
+                        is_link = True
                 except KeyError as key_error:
                     # XXX: For now we don't care about showing this output
                     #      to users
-                    # print('No folder. Assuming its added as a placeholder',
+                    # print('No folder \'%s\'. Assuming its added as a placeholder' %
                     #       filename)
-                    pass
+
+                    ghost_entry = True
 
                 folder_path = path.join(extraction_path,
-                                       filename)
-                makedirs(folder_path, exist_ok = True)
+                                        filename)
 
-                # TODO: Test me
-                # If we have a folder in the archive, copy its
-                # permissions/stat/mode to the target (but don't expand it)
-                if member:
-                    chmod(folder_path, member.mode)
-                    utime(folder_path, (member.mtime, member.mtime))
+                # If it's a placeholder dir entry, we just create it
+                if ghost_entry:
+                    super()._acquire_lock()
+                    makedirs(folder_path, exist_ok = True)
+                    super()._release_lock()
+                    return
 
-                    try:
-                        chown(folder_path, member.uid, member.gid)
-                    except PermissionError as pe:
-                        pass
+                # If we're netiher ghost dir, a link, nor a dir
+                # exit with an error
+                if not is_link and not member.isdir():
+                    raise RuntimeError('Non directory member found')
 
-                return
+                # For explicitly saved directories, we createe it
+                if not is_link:
+                    # If the foldere isn't there, creat it (locked)
+                    if not path.exists(folder_path):
+                        super()._acquire_lock()
+                        makedirs(folder_path, exist_ok = True)
+                        super()._release_lock()
 
-        makedirs(extraction_path, exist_ok = True)
+                    # TODO: Test me
+                    # Copy its permissions/stat/mode to the target
+                    # (but don't expand it)
+                    if member:
+                        chmod(folder_path, member.mode)
+                        utime(folder_path, (member.mtime, member.mtime))
+
+                        try:
+                            chown(folder_path, member.uid, member.gid)
+                        except PermissionError as pe:
+                            pass
+
+                        return
+
+                # Implicit fallthrough for links to regular logic
+
+        if not path.exists(extraction_path):
+            makedirs(extraction_path, exist_ok = True)
 
         # XXX: Not thread safe http://bugs.python.org/issue23649
+        super()._acquire_lock()
         try:
-            super()._acquire_lock()
-
             self.archive_object.extract(member, extraction_path)
-
+        finally:
             super()._release_lock()
-        except FileExistsError as fee:
-            # XXX tarfile also might have thread issues even with the lock
-            #     in place so if we get errors as reported on the bugtracker
-            #     (http://bugs.python.org/issue23649) we try to re-run the task.
-            # TODO: Test this (somehow)
-            super()._release_lock()
-
-            self.expand(filename, extraction_path)
-        except Exception as e:
-            super()._release_lock()
-
-            raise(e)
 
     def create(self, base_dir):
         for item in listdir(base_dir):
@@ -497,23 +528,32 @@ class XDelta3DirPatcher(object):
         old_path = path.join(old_root, filename)
         new_path = path.join(new_root, filename)
         target_path = path.join(target_root, filename)
-
         target_dir = path.dirname(target_path)
-        makedirs(target_dir, exist_ok = True)
 
         if self.args.debug: print("Diff:", old_path, new_path, target_path)
 
-        if path.islink(new_path):
-            new_dst = readlink(new_path)
-            symlink(new_dst, target_path)
-            if self.args.debug: print("symlink: ", [target_path, new_dst])
+        if path.islink(path.abspath(new_path)):
+            source_path = path.abspath(new_path)
+            dest_path = path.abspath(target_path)
+
+            target_dir = path.dirname(dest_path)
+            if not path.exists(target_dir):
+                makedirs(target_dir, exist_ok = True)
+
+            new_dst = readlink(source_path)
+            symlink(new_dst, dest_path)
+            if self.args.debug: print("symlink: ", [source_path, dest_path])
 
         elif path.isdir(new_path):
-            if not path.exists(target_path):
-                mkdir(target_path)
+            if not path.exists(target_dir):
+                makedirs(target_dir, exist_ok = True)
+
             self.copy_attributes(new_path, target_path)
 
         else:
+            if not path.exists(target_dir):
+                makedirs(target_dir, exist_ok = True)
+
             # Regular file
             if not path.isfile(old_path):
                 old_path = None
@@ -546,18 +586,26 @@ class XDelta3DirPatcher(object):
         patch_path = path.join(staging_dir, patch_file)
         target_path = path.join(target_root, rel_path)
 
+        target_dir = path.dirname(target_path)
         if args.debug: print("Apply:", old_path, patch_path, target_path)
 
         if path.islink(patch_path):
+            if path.normpath(target_path) != target_dir and\
+               not path.isdir(target_dir):
+                    if args.debug:
+                        print("Creating parent of a symlink:", target_dir)
+                    makedirs(target_dir, exist_ok = True)
+
             patch_dst = readlink(patch_path)
             symlink(patch_dst, target_path)
             if args.debug: print("symlink: ", [target_path, patch_dst])
 
         elif path.isdir(patch_path):
-            makedirs(target_path, exist_ok = True)
-            self.copy_attributes(patch_path, target_path)
-
+            makedirs(target_dir, exist_ok = True)
+            self.copy_attributes(patch_path, target_dir)
         else:
+            makedirs(target_dir, exist_ok = True)
+
             # Regular file
             if not path.isfile(old_path):
                 old_path = None
@@ -615,6 +663,7 @@ class XDelta3DirPatcher(object):
         rmtree(old_staging_dir)
         rmtree(new_staging_dir)
 
+        # TODO: Delegate this to archive impl
         print("\nWriting archive...")
         with tarfile.open(patch_bundle, 'w:gz', format=tarfile.GNU_FORMAT) as patch_archive:
             patch_archive.add(delta_target_dir, arcname=self.PATCH_FOLDER)
@@ -755,7 +804,8 @@ class XDelta3DirPatcher(object):
     @staticmethod
     def check_euid(ignore_euid, get_euid_method = geteuid):
         if (not ignore_euid) and get_euid_method() != 0:
-            stderr.write("ERROR: You must be root to apply the delta! Exiting.\n")
+            print >> sys.stderr, "ERROR: You must be root to apply the delta!" \
+                                 "Exiting.\n"
             raise Exception()
 
     @staticmethod

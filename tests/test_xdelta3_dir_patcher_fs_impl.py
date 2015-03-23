@@ -172,6 +172,21 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
         # files
         TestHelpers.compare_trees(self, source_dir, archive)
 
+    def test_symbolic_links_are_handled_correctly(self):
+        archive = path.join(self.temp_dir, 'test_archive')
+
+        source_dir = path.join(self.TEST_FILE_PREFIX, 'symlink')
+
+        with self.test_class(archive, True) as test_object:
+            # Add the files to archive
+            test_object.create(source_dir)
+
+        with self.test_class(archive) as test_object:
+            for item in test_object.list_files():
+                test_object.expand(item, self.temp_dir2)
+
+        TestHelpers.compare_trees(self, source_dir, self.temp_dir2)
+
     # ---------------------------- PERMISSIONS TESTS -----------------------------
     # XXX: Since permissions aren't preserved in git nor are they creatable
     #      in tests, it's not feasible to create robust run-anywhere tests
