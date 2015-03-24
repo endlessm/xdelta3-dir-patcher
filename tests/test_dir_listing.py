@@ -26,6 +26,10 @@ from mock import Mock
 # often.
 patcher = imp.load_source("xdelta3-dir-patcher", "xdelta3-dir-patcher")
 
+class FakeSubdir(patcher.DirListing):
+    def __init__(self, version):
+        self.version = version
+
 class FakeMember(object):
     def __init__(self, version):
         self.version = version
@@ -77,3 +81,30 @@ class TestDirListing(unittest.TestCase):
         self.add_mock_file(test_object, 2)
 
         self.verify_mock_files(test_object, [1, 2])
+
+    def test_adding_dirs_works(self):
+        test_object = self.test_class()
+
+        subdir1 = FakeSubdir(1)
+        subdir2 = FakeSubdir(2)
+
+        expected_subdirs = [ subdir1, subdir2 ]
+
+        test_object.add_subdir(subdir1)
+        test_object.add_subdir(subdir2)
+
+        self.assertEqual(len(expected_subdirs), len(test_object.dirs))
+        self.assertEqual(expected_subdirs, test_object.dirs)
+
+    def test_adding_dirs_only_accepts_dir_listing_class(self):
+        test_object = self.test_class()
+
+        class Foo(object):
+            pass
+
+        try:
+            test_object.add_subdir(Foo())
+        except AssertionError:
+            pass
+        else:
+            self.fail('Did not reject unknown subdir class')

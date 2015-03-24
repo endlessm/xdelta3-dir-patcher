@@ -56,14 +56,20 @@ class DirListing(object):
 
     def __init__(self):
         self._files = []
+        self._dirs = []
 
     @property
     def dirs(self):
-        return []
+        return self._dirs
 
     @property
     def files(self):
         return self._files
+
+    def add_subdir(self, subdir):
+        assert isinstance(subdir, self.__class__)
+
+        self._dirs.append(subdir)
 
     def add_file(self, name, data, permissions, uname, uid, gname, gid):
         file_dict = { 'name': name, 'permissions': permissions, 'data': data,
