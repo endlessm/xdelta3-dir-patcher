@@ -55,7 +55,7 @@ class DirListing(object):
         return self[attr]
 
     def __init__(self):
-        pass
+        self._files = []
 
     @property
     def dirs(self):
@@ -63,7 +63,16 @@ class DirListing(object):
 
     @property
     def files(self):
-        return []
+        return self._files
+
+    def add_file(self, name, data, permissions, uname, uid, gname, gid):
+        file_dict = { 'name': name, 'permissions': permissions, 'data': data,
+                      'uname': uname,
+                      'uid': uid,
+                      'gname': gname,
+                      'gid': gid }
+
+        self._files.append(AttributeDict(file_dict))
 
 # ---------------------------- PROCESS RUNNER ----------------------------
 class ExecutorRunner(object):
