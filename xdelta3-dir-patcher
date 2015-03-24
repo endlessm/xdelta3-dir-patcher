@@ -51,12 +51,18 @@ class AttributeDict(dict):
 
 # ---------------------------- DIR LISTING ----------------------------
 class DirListing(object):
-    def __getattr__(self, attr):
-        return self[attr]
-
     def __init__(self):
         self._files = []
         self._dirs = []
+
+    def set_metadata(self, name, data, permissions, uname, uid, gname, gid):
+        self.name = name
+        self.data = data
+        self.permissions = permissions
+        self.uname = uname
+        self.uid = uid
+        self.gname = gname
+        self.gid = gid
 
     @property
     def dirs(self):

@@ -108,3 +108,25 @@ class TestDirListing(unittest.TestCase):
             pass
         else:
             self.fail('Did not reject unknown subdir class')
+
+    def test_set_object_attributes_works(self):
+        test_object = self.test_class()
+
+        data = FakeMember(999)
+
+        test_object.set_metadata("name",
+                                 data,
+                                 1,
+                                 "username",
+                                 10,
+                                 "groupname",
+                                 100)
+
+        self.assertEquals(test_object.name, "name")
+        self.assertEquals(test_object.permissions, 1)
+        self.assertEquals(test_object.uname, "username")
+        self.assertEquals(test_object.uid, 10)
+        self.assertEquals(test_object.gname, "groupname")
+        self.assertEquals(test_object.gid, 100)
+        self.assertEquals(test_object.data.version, 999)
+
