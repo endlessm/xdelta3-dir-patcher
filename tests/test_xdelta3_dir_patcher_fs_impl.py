@@ -56,19 +56,41 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
     def get_archive(self, name):
         return path.join(self.TEST_FILE_PREFIX, '%s' % name)
 
-    def expected_new_version1_members(self):
-        return ['binary_file',
-                'long_lorem.txt',
-                'new folder/',
-                'new folder/new file1.txt',
-                'new folder/new_folder/',
-                'new folder/new_folder/new_file2.txt',
-                'short_lorem.txt',
-                'updated folder/',
-                'updated folder/updated file.txt',
-                'updated folder/updated_folder/',
-                'updated folder/updated_folder/updated_file2.txt',
-                'updated folder/.hidden_updated_file.txt']
+    def verify_new_version1_members(self, actual_members):
+        folders = [ None,  # Root
+                    'new folder',
+                    'new folder/new_folder',
+                    'updated folder',
+                    'updated folder/updated_folder' ]
+
+        files =  ['binary_file',
+                  'long_lorem.txt',
+                  'new folder/new file1.txt',
+                  'new folder/new_folder/new_file2.txt',
+                  'short_lorem.txt',
+                  'updated folder/updated file.txt',
+                  'updated folder/updated_folder/updated_file2.txt',
+                  'updated folder/.hidden_updated_file.txt']
+
+        all_items = folders + files
+
+        print(actual_members.keys())
+        self.assertEquals(len(all_items),
+                          len(actual_members))
+
+        # Folder check
+        for member in all_items:
+            self.assertIn(member, actual_members.keys())
+
+        for folder in folders:
+            self.assertTrue(isinstance(actual_members[folder],
+                                       patcher.DirListing))
+
+        for filename in files:
+            print("filename:", filename)
+            print("file: ", actual_members[filename])
+            self.assertTrue(isinstance(actual_members[filename],
+                                       patcher.AttributeDict))
 
     def test_can_open_works(self):
         prefix = path.join('tests', 'test_files', 'archive_instance')
@@ -82,13 +104,9 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
     def test_can_list_members_correctly(self):
         archive = self.get_archive('new_version1')
         with self.test_class(archive) as test_object:
-            actual_members = test_object.list_files()
+            actual_members = test_object.list_items()
 
-            self.assertEquals(len(self.expected_new_version1_members()),
-                              len(actual_members))
-
-            for member in self.expected_new_version1_members():
-                self.assertIn(member, actual_members)
+            self.verify_new_version1_members(actual_members)
 
     def test_list_members_is_cached(self):
         archive = self.get_archive('new_version1')
@@ -98,20 +116,13 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
 
         with self.test_class(archive) as test_object:
             # Force a load of the index
-            initial_members = test_object.list_files()
-            self.assertEquals(len(self.expected_new_version1_members()),
-                              len(initial_members))
+            self.verify_new_version1_members(test_object.list_items())
 
             # Remove the archive
             rmtree(archive)
 
             # Test invocation
-            actual_members = test_object.list_files()
-
-            self.assertEquals(len(self.expected_new_version1_members()),
-                              len(actual_members))
-            for member in self.expected_new_version1_members():
-                self.assertIn(member, actual_members)
+            self.verify_new_version1_members(test_object.list_items())
 
     def test_can_extract_files_correctly(self):
         archive = self.get_archive('new_version1')
@@ -129,7 +140,7 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
         archive = self.get_archive('new_version1')
         test_object = self.test_class(archive)
 
-        folder_name = 'new folder/'
+        folder_name = 'new folder'
 
         test_object.expand(folder_name, self.temp_dir)
 
@@ -182,18 +193,18 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
             test_object.create(source_dir)
 
         with self.test_class(archive) as test_object:
-            for item in test_object.list_files():
+            for item in test_object.list_items():
                 test_object.expand(item, self.temp_dir2)
 
         TestHelpers.compare_trees(self, source_dir, self.temp_dir2)
 
     # ---------------------------- PERMISSIONS TESTS -----------------------------
-    # XXX: Since permissions aren't preserved in git nor are they creatable
+    # XXX: Since permissions aren't preserved in git nor are they settable
     #      in tests, it's not feasible to create robust run-anywhere tests
     #      that can truly be run on any platform which is why these are
     #      conditional based on a very special test environment and a folder
     #      which has content matching tests/test_files/permissions_new.tgz
-    #      and permissions that match.
+    #      and permissions as indicated in the file.
 
     @unittest.skipUnless(ALLOW_PERMISSION_TESTS, 'Test platform unsupported')
     def test_gid_and_uid_of_added_files_are_correct(self):

@@ -44,13 +44,14 @@ class TestDirListing(unittest.TestCase):
     # Helpers
     def add_mock_file(self, test_object, version):
         data = FakeMember(version)
-        test_object.add_file("name%s" % version,
-                             data,
-                             1 + version,
-                             "username%s" % version,
-                             10 + version,
-                             "groupname%s" % version,
-                             100 + version)
+        return test_object.add_file("name%s" % version,
+                                    data,
+                                    1 + version,
+                                    "username%s" % version,
+                                    10 + version,
+                                    "groupname%s" % version,
+                                    100 + version,
+                                    version % 2 == 0)
 
     def verify_mock_files(self, test_object, versions):
         self.assertEqual(len(versions), len(test_object.files))
@@ -64,10 +65,13 @@ class TestDirListing(unittest.TestCase):
             self.assertEquals(file_obj.uid, 10 + version)
             self.assertEquals(file_obj.gname, "groupname%s" % version)
             self.assertEquals(file_obj.gid, 100 + version)
+            self.assertEquals(file_obj.is_link, version % 2 == 0)
             self.assertEquals(file_obj.data.version, version)
 
-    # Tests
+            self.assertEquals(file_obj.is_file, True)
+            self.assertEquals(file_obj.is_dir, False)
 
+    # Tests
     def test_starts_with_no_directories_nor_files(self):
         test_object = self.test_class()
 
@@ -81,6 +85,15 @@ class TestDirListing(unittest.TestCase):
         self.add_mock_file(test_object, 2)
 
         self.verify_mock_files(test_object, [1, 2])
+
+    def test_adding_file_returns_that_object(self):
+        test_object = self.test_class()
+
+        file_obj = self.add_mock_file(test_object, 1)
+        self.assertEquals(file_obj, test_object.files[-1])
+
+        file_obj = self.add_mock_file(test_object, 2)
+        self.assertEquals(file_obj, test_object.files[-1])
 
     def test_adding_dirs_works(self):
         test_object = self.test_class()
@@ -120,7 +133,8 @@ class TestDirListing(unittest.TestCase):
                                  "username",
                                  10,
                                  "groupname",
-                                 100)
+                                 100,
+                                 True)
 
         self.assertEquals(test_object.name, "name")
         self.assertEquals(test_object.permissions, 1)
@@ -128,5 +142,8 @@ class TestDirListing(unittest.TestCase):
         self.assertEquals(test_object.uid, 10)
         self.assertEquals(test_object.gname, "groupname")
         self.assertEquals(test_object.gid, 100)
+        self.assertEquals(test_object.is_link, True)
         self.assertEquals(test_object.data.version, 999)
 
+        self.assertEquals(test_object.is_file, False)
+        self.assertEquals(test_object.is_dir, True)

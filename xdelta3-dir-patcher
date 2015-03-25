@@ -31,12 +31,15 @@ import concurrent.futures
 from stat import *
 from filecmp import dircmp
 from sys import stderr, stdout
+from io import StringIO
 from tempfile import mkdtemp
 from subprocess import check_output, STDOUT, CalledProcessError
 from shutil import copymode, copystat, copyfile, copy2, rmtree, copytree
-from os import chmod, chown, cpu_count, geteuid, listdir, makedirs, mkdir
+from os import chmod, chown, cpu_count, geteuid, listdir, lstat, makedirs, mkdir
 from os import O_NOFOLLOW, O_RDONLY, path, readlink, remove, rmdir, symlink, sep
 from os import stat, utime, walk
+from pwd import getpwuid
+from grp import getgrgid
 
 from os import open as os_open #Prevent mangling the regular open()
 
@@ -55,7 +58,10 @@ class DirListing(object):
         self._files = []
         self._dirs = []
 
-    def set_metadata(self, name, data, permissions, uname, uid, gname, gid):
+        self.is_dir = True
+        self.is_file = False
+
+    def set_metadata(self, name, data, permissions, uname, uid, gname, gid, is_link):
         self.name = name
         self.data = data
         self.permissions = permissions
@@ -63,6 +69,7 @@ class DirListing(object):
         self.uid = uid
         self.gname = gname
         self.gid = gid
+        self.is_link = is_link
 
     @property
     def dirs(self):
@@ -77,14 +84,63 @@ class DirListing(object):
 
         self._dirs.append(subdir)
 
-    def add_file(self, name, data, permissions, uname, uid, gname, gid):
+    def add_file(self, name, data, permissions, uname, uid, gname, gid, is_link):
         file_dict = { 'name': name, 'permissions': permissions, 'data': data,
                       'uname': uname,
                       'uid': uid,
                       'gname': gname,
-                      'gid': gid }
+                      'gid': gid,
+                      'is_link': is_link,
+                      'is_file': True,
+                      'is_dir': False }
 
         self._files.append(AttributeDict(file_dict))
+
+        return self._files[-1]
+
+    def _formatted_file_str(self, file_obj):
+        output_str = file_obj.name
+
+        permission_letters = 'rwxrwxrwx'
+        permission_masks = [ S_IRUSR, S_IWUSR, S_IXUSR,
+                             S_IRGRP, S_IWGRP, S_IXGRP,
+                             S_IROTH, S_IWOTH, S_IXOTH ]
+
+        permissions = ''
+        for letter, mask in zip(permission_letters, permission_masks):
+            permissions += letter if mask & file_obj.permissions else '-'
+
+        is_link = ' ↝' if file_obj.is_link else ''
+
+        output_str = '(%s)%s %s' % (permissions, is_link, output_str)
+        return output_str
+
+    def _print_dir_listing(self, root, output, root_path = ""):
+        relative_path = path.join(root_path, root.name)
+
+        padding = relative_path.count(path.sep)
+
+        is_link = ' ↝' if root.is_link else ''
+        print('| ' * padding +  '⇩', relative_path, is_link, file = output)
+
+        for subdir in root.dirs:
+           self._print_dir_listing(subdir, output, path.join(root_path, root.name))
+
+        for filename in root.files:
+            print('| ' * padding + "↳", self._formatted_file_str(filename),
+                  file = output)
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        output = StringIO()
+
+        print('-' * 70, file = output)
+        self._print_dir_listing(self, output)
+        print('-' * 70, file = output)
+
+        return output.getvalue()
 
 # ---------------------------- PROCESS RUNNER ----------------------------
 class ExecutorRunner(object):
@@ -169,7 +225,7 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
         super().__init__()
 
         self.path = path
-        self.items = None
+        self._members = None
 
     # Placeholders to allow us to use 'with` keywords on this implementation
     def __enter__(self):
@@ -185,43 +241,83 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
     def can_open(archive):
         return path.isdir(archive)
 
-    def list_files(self):
-        if self.items:
-            return self.items
+    @property
+    def members(self):
+        if self._members:
+            return self._members
 
         print('FS: Gathering filelist')
-        items = []
+        member_tree = {}
         for root, dirs, filenames in walk(self.path):
-            for directory in dirs:
-                absolute_path = path.join(root, directory)
+            relative_path = path.relpath(root, self.path)
 
-                # Strip prefix so the files look relative
-                relative_path = path.relpath(absolute_path, self.path) + path.sep
+            current_dir = DirListing()
+            member_tree[relative_path] = current_dir
 
-                items.append(relative_path)
+            parent_dir = path.dirname(relative_path)
+            if root != self.path and not parent_dir:
+                parent_dir = '.'
+
+            absolute_path = path.join(root)
+
+            uid = lstat(absolute_path).st_uid
+            gid = lstat(absolute_path).st_gid
+            current_dir.set_metadata(path.basename(absolute_path),
+                                     absolute_path,
+                                     S_IMODE(lstat(absolute_path).st_mode),
+                                     getpwuid(uid)[0],
+                                     uid,
+                                     getgrgid(gid)[0],
+                                     gid,
+                                     path.islink(absolute_path))
+
+            if parent_dir in member_tree:
+                member_tree[parent_dir].add_subdir(current_dir)
 
             for filename in filenames:
                 absolute_path = path.join(root, filename)
-
-                # Strip prefix so the files look relative
                 relative_path = path.relpath(absolute_path, self.path)
 
-                items.append(relative_path)
+                # Have the listing for the file in the map but
+                # don't associate a DirListing object to it
+
+                uid = lstat(absolute_path).st_uid
+                gid = lstat(absolute_path).st_gid
+                mode = S_IMODE(lstat(absolute_path).st_mode)
+                file_dict = current_dir.add_file(path.basename(absolute_path),
+                                                 absolute_path,
+                                                 mode,
+                                                 getpwuid(uid)[0],
+                                                 uid,
+                                                 getgrgid(gid)[0],
+                                                 gid,
+                                                 path.islink(absolute_path))
+
+                member_tree[relative_path] = file_dict
+
+        member_tree[None] = member_tree.pop('.')
+        self._members = member_tree
 
         print('FS: Gathering completed')
+        print(member_tree[None])
 
-        self.items = items
+        return self._members
 
-        return self.items
+    def list_items(self):
+        return self.members
 
-    def expand(self, filename, extraction_path):
-        source_path = path.join(self.path, filename)
-        target_path = path.join(extraction_path, filename)
+    def expand(self, root, extraction_path):
+        assert root in self.members, 'Unknown member path specified'
 
-        is_link = path.islink(path.abspath(source_path))
-        is_file = not target_path.endswith(path.sep)
+        root_obj = self.members[root]
 
-        if is_link:
+        if not root:
+            root = '.'
+
+        source_path = path.join(self.path, root)
+        target_path = path.join(extraction_path, root)
+
+        if root_obj.is_link:
             source_path = path.abspath(source_path)
             target_path = path.abspath(target_path)
 
@@ -231,7 +327,7 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
 
             link_target = readlink(source_path)
             symlink(link_target, target_path)
-        elif is_file:
+        elif root_obj.is_file:
             dir_path = path.dirname(target_path)
             if not path.exists(dir_path):
                 makedirs(dir_path, exist_ok = True)
@@ -246,10 +342,7 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
             copystat(source_path, target_path)
 
             try:
-                uid = stat(source_path).st_uid
-                gid = stat(source_path).st_gid
-
-                chown(target_path,uid,gid)
+                chown(target_path,root_obj.uid,root_obj.gid)
             except PermissionError as pe:
                 # XXX: We can't copy the uid/gid unless we're run as root
                 #      which means that in most cases we can't get that 
