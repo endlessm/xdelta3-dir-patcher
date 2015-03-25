@@ -54,12 +54,15 @@ class AttributeDict(dict):
 
 # ---------------------------- DIR LISTING ----------------------------
 class DirListing(object):
-    def __init__(self):
+    def __init__(self, name = None):
         self._files = []
         self._dirs = []
 
         self.is_dir = True
         self.is_file = False
+        self.is_link = False
+
+        self.name = name
 
     def set_metadata(self, name, data, permissions, uname, uid, gname, gid, is_link):
         self.name = name
@@ -107,24 +110,30 @@ class DirListing(object):
                              S_IROTH, S_IWOTH, S_IXOTH ]
 
         permissions = ''
-        for letter, mask in zip(permission_letters, permission_masks):
-            permissions += letter if mask & file_obj.permissions else '-'
+        if file_obj.permissions:
+            permissions += '('
+            for letter, mask in zip(permission_letters, permission_masks):
+                permissions += letter if mask & file_obj.permissions else '-'
+            permissions += ')'
 
         is_link = ' ↝' if file_obj.is_link else ''
 
-        output_str = '(%s)%s %s' % (permissions, is_link, output_str)
+        output_str = '%s%s %s' % (permissions, is_link, output_str)
         return output_str
 
     def _print_dir_listing(self, root, output, root_path = ""):
         relative_path = path.join(root_path, root.name)
-
         padding = relative_path.count(path.sep)
-
         is_link = ' ↝' if root.is_link else ''
+
         print('| ' * padding +  '⇩', relative_path, is_link, file = output)
 
         for subdir in root.dirs:
-           self._print_dir_listing(subdir, output, path.join(root_path, root.name))
+            dir_path = path.join(root_path, root.name)
+            if not root_path:
+                dir_path = path.sep
+
+            self._print_dir_listing(subdir, output, dir_path)
 
         for filename in root.files:
             print('| ' * padding + "↳", self._formatted_file_str(filename),
@@ -264,6 +273,7 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
 
         print('FS: Gathering filelist')
         member_tree = {}
+        member_tree['.'] = DirListing()
         for root, dirs, filenames in walk(self.path):
             relative_path = path.relpath(root, self.path)
 
@@ -340,7 +350,7 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
             copystat(source_path, target_path)
 
             try:
-                chown(target_path,root_obj.uid,root_obj.gid)
+                chown(target_path, root_obj.uid, root_obj.gid)
             except PermissionError as pe:
                 # XXX: We can't copy the uid/gid unless we're run as root
                 #      which means that in most cases we can't get that 
@@ -503,7 +513,7 @@ class XDelta3ZipImpl(XDelta3AbstractArchiveImpl):
     def __init__(self, archive_path, for_writing = False):
         super().__init__()
 
-        self.items = None
+        self._members = None
 
         flags = 'r'
 
@@ -514,6 +524,7 @@ class XDelta3ZipImpl(XDelta3AbstractArchiveImpl):
             flags = 'w'
 
         self.archive_object = zipfile.ZipFile(archive_path, flags)
+        self.archive_path = archive_path
 
     def _close_archive(self):
         self.archive_object.close()
@@ -531,20 +542,74 @@ class XDelta3ZipImpl(XDelta3AbstractArchiveImpl):
     def can_open(archive):
         return path.isfile(archive) and zipfile.is_zipfile(archive)
 
-    def list_files(self):
-        if self.items:
-            return self.items
+    def _add_listing_object(self, dir_listing, method, name):
+        zip_obj = self.archive_object.getinfo(name)
+        setter_func = getattr(dir_listing, method)
+
+        basename = ''
+        filename = zip_obj.filename
+        if filename.endswith(path.sep):
+            basename = path.basename(filename.rstrip(path.sep))
+        else:
+            basename = path.basename(filename)
+
+        return setter_func(basename, zip_obj, None,
+                           None,
+                           None,
+                           None,
+                           None,
+                           False)
+
+    @property
+    def members(self):
+        if self._members:
+            return self._members
+
+        items = {}
 
         print('Zip: Gathering filelist')
-        items = self.archive_object.namelist()
+
+        # Sorted to ensure that we do top-down traversal
+        sorted_names = sorted(self.archive_object.namelist(),
+                              key = len)
+
+        items[None] = DirListing(path.basename(self.archive_path))
+
+        for name in sorted_names:
+            if name.endswith(path.sep):
+                fixed_name = name.rstrip(path.sep)
+                dir_listing = DirListing()
+
+                items[fixed_name] = dir_listing
+
+                self._add_listing_object(dir_listing, 'set_metadata', name)
+
+                parent_dir = path.dirname(fixed_name)
+                if not parent_dir:
+                    parent_dir = None
+
+                items[parent_dir].add_subdir(dir_listing)
+            else:
+                dir_name = path.dirname(name)
+                if not dir_name:
+                    dir_name = None
+
+                dir_listing = items[dir_name]
+
+                file_obj = self._add_listing_object(dir_listing, 'add_file', name)
+                items[name] = file_obj
+
         print('Zip: Gathering completed')
 
         # Intentional separation of variables so that we don't assign
         # some garbage value to self.items as well as print out the debug
         # messages
-        self.items = items
+        self._members = items
 
-        return self.items
+        return self._members
+
+    def list_items(self):
+        return self.members
 
     def expand(self, filename, extraction_path):
         makedirs(extraction_path, exist_ok = True)

@@ -78,6 +78,17 @@ class TestDirListing(unittest.TestCase):
         self.assertEqual([], test_object.dirs)
         self.assertEqual([], test_object.files)
 
+    def test_starts_with_some_predefined_props(self):
+        test_object = self.test_class()
+
+        self.assertEqual(None, test_object.name)
+        self.assertEqual(False, test_object.is_link)
+
+    def test_can_be_initialized_with_optional_name(self):
+        test_object = self.test_class('foobar')
+
+        self.assertEqual('foobar', test_object.name)
+
     def test_adding_files_works(self):
         test_object = self.test_class()
 

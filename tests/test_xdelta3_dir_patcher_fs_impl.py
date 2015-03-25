@@ -74,7 +74,7 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
 
         all_items = folders + files
 
-        print(actual_members.keys())
+        print(actual_members[None])
         self.assertEquals(len(all_items),
                           len(actual_members))
 
@@ -87,8 +87,6 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
                                        patcher.DirListing))
 
         for filename in files:
-            print("filename:", filename)
-            print("file: ", actual_members[filename])
             self.assertTrue(isinstance(actual_members[filename],
                                        patcher.AttributeDict))
 
