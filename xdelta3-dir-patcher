@@ -612,9 +612,13 @@ class XDelta3ZipImpl(XDelta3AbstractArchiveImpl):
         return self.members
 
     def expand(self, filename, extraction_path):
-        makedirs(extraction_path, exist_ok = True)
+        assert filename in self.members
 
-        self.archive_object.extract(filename, extraction_path)
+        if not path.isdir(extraction_path):
+            makedirs(extraction_path, exist_ok = True)
+
+        self.archive_object.extract(self.members[filename].data,
+                                    extraction_path)
 
     def create(self, base_dir):
         for root, dirnames, filenames in walk(base_dir):

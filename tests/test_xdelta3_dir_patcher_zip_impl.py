@@ -70,7 +70,7 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
 
         all_items = folders + files
 
-        print(actual_members.keys())
+        print(actual_members[None])
         self.assertEquals(len(all_items),
                           len(actual_members))
 
