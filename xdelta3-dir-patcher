@@ -241,6 +241,22 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
     def can_open(archive):
         return path.isdir(archive)
 
+    def _add_listing_object(self, dir_listing, method, absolute_path):
+        uid = lstat(absolute_path).st_uid
+        gid = lstat(absolute_path).st_gid
+        mode = S_IMODE(lstat(absolute_path).st_mode)
+
+        setter_func = getattr(dir_listing, method)
+
+        return setter_func(path.basename(absolute_path),
+                           absolute_path,
+                           mode,
+                           getpwuid(uid)[0],
+                           uid,
+                           getgrgid(gid)[0],
+                           gid,
+                           path.islink(absolute_path))
+
     @property
     def members(self):
         if self._members:
@@ -258,18 +274,7 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
             if root != self.path and not parent_dir:
                 parent_dir = '.'
 
-            absolute_path = path.join(root)
-
-            uid = lstat(absolute_path).st_uid
-            gid = lstat(absolute_path).st_gid
-            current_dir.set_metadata(path.basename(absolute_path),
-                                     absolute_path,
-                                     S_IMODE(lstat(absolute_path).st_mode),
-                                     getpwuid(uid)[0],
-                                     uid,
-                                     getgrgid(gid)[0],
-                                     gid,
-                                     path.islink(absolute_path))
+            self._add_listing_object(current_dir, 'set_metadata', root)
 
             if parent_dir in member_tree:
                 member_tree[parent_dir].add_subdir(current_dir)
@@ -281,30 +286,27 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
                 # Have the listing for the file in the map but
                 # don't associate a DirListing object to it
 
-                uid = lstat(absolute_path).st_uid
-                gid = lstat(absolute_path).st_gid
-                mode = S_IMODE(lstat(absolute_path).st_mode)
-                file_dict = current_dir.add_file(path.basename(absolute_path),
-                                                 absolute_path,
-                                                 mode,
-                                                 getpwuid(uid)[0],
-                                                 uid,
-                                                 getgrgid(gid)[0],
-                                                 gid,
-                                                 path.islink(absolute_path))
+                file_dict = self._add_listing_object(current_dir,
+                                                     'add_file',
+                                                     absolute_path)
 
                 member_tree[relative_path] = file_dict
 
+        # Make sure that the root has a real unique value rather than '.'
         member_tree[None] = member_tree.pop('.')
-        self._members = member_tree
 
         print('FS: Gathering completed')
-        print(member_tree[None])
+
+        self._members = member_tree
 
         return self._members
 
     def list_items(self):
         return self.members
+
+    def _makedirs_with_check(self, directory):
+        if not path.exists(directory):
+            makedirs(directory, exist_ok = True)
 
     def expand(self, root, extraction_path):
         assert root in self.members, 'Unknown member path specified'
@@ -317,24 +319,20 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
         source_path = path.join(self.path, root)
         target_path = path.join(extraction_path, root)
 
+        dir_path = path.dirname(target_path)
+
         if root_obj.is_link:
+            self._makedirs_with_check(dir_path)
+
             source_path = path.abspath(source_path)
             target_path = path.abspath(target_path)
 
-            dir_path = path.dirname(target_path)
-            if not path.exists(dir_path):
-                makedirs(dir_path, exist_ok = True)
-
-            link_target = readlink(source_path)
-            symlink(link_target, target_path)
+            symlink(readlink(source_path), target_path)
         elif root_obj.is_file:
-            dir_path = path.dirname(target_path)
-            if not path.exists(dir_path):
-                makedirs(dir_path, exist_ok = True)
-
+            self._makedirs_with_check(dir_path)
             copy2(source_path, target_path, follow_symlinks = False)
         else:
-            makedirs(target_path, exist_ok = True)
+            self._makedirs_with_check(target_path)
 
             # TODO: Test me
             # Ensure that permissions/ids are transferred along to the target
