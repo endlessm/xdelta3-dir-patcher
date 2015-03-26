@@ -86,6 +86,19 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
             TestHelpers.verify_new_version1_members(self, patcher,
                                                     test_object.list_items())
 
+    def test_list_members_is_cached_on_load(self):
+        orig_archive = self.get_archive('new_version1')
+        archive = path.join(self.temp_dir, 'new_version1.tgz')
+        copyfile(orig_archive, archive)
+
+        with self.test_class(archive) as test_object:
+            remove(archive)
+
+            # Force a load of the index
+            TestHelpers.verify_new_version1_members(self,
+                                                    patcher,
+                                                    test_object.list_items())
+
     def test_can_extract_members_correctly(self):
         archive = self.get_archive('new_version1')
 

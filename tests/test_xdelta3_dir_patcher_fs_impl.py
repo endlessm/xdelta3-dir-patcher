@@ -93,6 +93,20 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
                                                     patcher,
                                                     test_object.list_items())
 
+    def test_list_members_is_cached_on_load(self):
+        archive = self.get_archive('new_version1')
+        orig_archive = path.join(self.TEST_FILE_PREFIX, 'new_version1')
+        archive = path.join(self.temp_dir, 'new_version1')
+        copytree(orig_archive, archive)
+
+        with self.test_class(archive) as test_object:
+            rmtree(archive)
+
+            # Force a load of the index
+            TestHelpers.verify_new_version1_members(self,
+                                                    patcher,
+                                                    test_object.list_items())
+
     def test_can_extract_files_correctly(self):
         archive = self.get_archive('new_version1')
         test_object = self.test_class(archive)

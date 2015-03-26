@@ -240,12 +240,22 @@ class XDelta3AbstractArchiveImpl(object):
     def _release_lock(self):
         self.lock.release()
 
+    def list_items(self):
+        assert self.members
+
+        return self.members
+
 class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
     def __init__(self, path, for_writing = False):
         super().__init__()
 
         self.path = path
         self._members = None
+
+        # Pre-fetch member data to ensure only one thread tries to create
+        # the initial list and to allow further listings to not need locks
+        if not for_writing:
+            self.list_items()
 
     # Placeholders to allow us to use 'with` keywords on this implementation
     def __enter__(self):
@@ -282,12 +292,13 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
 
         return file_obj
 
+    # XXX: Not thread safe when uninitialized
     @property
     def members(self):
         if self._members:
             return self._members
 
-        print('FS: Gathering filelist')
+        print('FS: Gathering filelist (%s/)' % path.basename(self.path))
         member_tree = {}
         member_tree['.'] = DirListing()
         for root, dirs, filenames in walk(self.path):
@@ -321,14 +332,11 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
         # Make sure that the root has a real unique value rather than '.'
         member_tree[None] = member_tree.pop('.')
 
-        print('FS: Gathering completed')
+        print('FS: Gathering completed (%s/)' % path.basename(self.path))
 
         self._members = member_tree
 
         return self._members
-
-    def list_items(self):
-        return self.members
 
     def _makedirs_with_check(self, directory):
         if not path.exists(directory):
@@ -404,6 +412,11 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
         self.archive_object = tarfile.open(archive_path, flags)
         self.archive_name = path.basename(archive_path)
 
+        # Pre-fetch member data to ensure only one thread tries to create
+        # the initial list and to allow further listings to not need locks
+        if not for_writing:
+            self.list_items()
+
     def _close_archive(self):
         self.archive_object.close()
 
@@ -437,13 +450,11 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
 
         return file_obj
 
-
+    # XXX: Not thread safe when uninitialized
     @property
     def members(self):
         if self._items:
             return self._items
-
-        super()._acquire_lock()
 
         print('Tar: Gathering filelist')
         members = self.archive_object.getmembers()
@@ -494,16 +505,10 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
             items[filename] = file_obj
 
         print('Tar: Gathering completed')
-        print(items[None])
 
         self._items = items
 
-        super()._release_lock()
-
         return self._items
-
-    def list_items(self):
-        return self.members
 
     def expand(self, root, extraction_path):
         assert root in self.members, \
@@ -529,7 +534,7 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
         if file_obj.data:
             member = file_obj.data
         else:
-            # This is for folders that are returned by list_files which
+            # This is for folders that are returned by list_items which
             # don't have a matching folder within the archive
             folder_path = path.join(sef.extraction_path, root)
 
@@ -590,6 +595,11 @@ class XDelta3ZipImpl(XDelta3AbstractArchiveImpl):
         self.archive_object = zipfile.ZipFile(archive_path, flags)
         self.archive_path = archive_path
 
+        # Pre-fetch member data to ensure only one thread tries to create
+        # the initial list and to allow further listings to not need locks
+        if not for_writing:
+            self.list_items()
+
     def _close_archive(self):
         self.archive_object.close()
 
@@ -624,6 +634,7 @@ class XDelta3ZipImpl(XDelta3AbstractArchiveImpl):
                            None,
                            False)
 
+    # XXX: Not thread safe when uninitialized
     @property
     def members(self):
         if self._members:
@@ -671,9 +682,6 @@ class XDelta3ZipImpl(XDelta3AbstractArchiveImpl):
         self._members = items
 
         return self._members
-
-    def list_items(self):
-        return self.members
 
     def expand(self, root, extraction_path):
         assert root in self.members, \
@@ -784,7 +792,7 @@ class XDelta3DirPatcher(object):
 
         new_archive_obj.expand(filename, new_root)
 
-        if filename in old_archive_obj.list_files():
+        if filename in old_archive_obj.list_items().keys():
             old_archive_obj.expand(filename, old_root)
 
         old_path = path.join(old_root, filename)
@@ -900,11 +908,10 @@ class XDelta3DirPatcher(object):
             new_staging_dir = mkdtemp(prefix='%s_new_src' % XDelta3DirPatcher.__name__,
                                       dir=staging_dir)
 
-            # XXX: Preload old archive file list to avoid concurrency issues
-            # TODO: Make the listing thread-safe
-            old_archive_obj.list_files()
+            for filename in new_archive_obj.list_items().keys():
+                if not filename:
+                    continue
 
-            for filename in new_archive_obj.list_files():
                 if self.args.debug:
                     print('Queueing \'%s\'' % filename)
                 else:
@@ -1000,12 +1007,12 @@ class XDelta3DirPatcher(object):
         print('Enumerating old files')
         old_files = []
         with XDeltaArchive(old_dir) as old_archive:
-            old_files = old_archive.list_files()
+            old_files = old_archive.list_items()
         if self.args.verbose: print("Old: %s" % old_files)
 
         print('Applying patches from %s' % patch_bundle)
         with XDeltaArchive(patch_bundle) as patch_archive:
-            all_archive_items = patch_archive.list_files()
+            all_archive_items = patch_archive.list_items().keys()
             if self.args.verbose: print("All in patch: %s" % all_archive_items)
 
             patches = [p for p in all_archive_items if p.startswith(delta_patch_root)]
