@@ -87,6 +87,7 @@ class TestDirListing(unittest.TestCase):
 
         self.assertEqual(None, test_object.name)
         self.assertEqual(False, test_object.is_link)
+        self.assertEqual(None, test_object.data)
 
     def test_can_be_initialized_with_optional_name(self):
         test_object = self.test_class('foobar')

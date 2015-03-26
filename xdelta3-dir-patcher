@@ -63,6 +63,7 @@ class DirListing(object):
         self.is_dir = True
         self.is_file = False
         self.is_link = False
+        self.data = None
 
         self.name = name
 
@@ -450,6 +451,24 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
 
         return file_obj
 
+    def _create_dir_structure_to(self, items, target_path):
+        target_path_segments = target_path.split(path.sep)
+        for index, segment in enumerate(target_path_segments):
+            segment_path = path.sep.join(target_path_segments[0:index + 1])
+
+            # Skip paths that are in hierarchy
+            if segment_path in items:
+                continue
+
+            parent_obj = items[None]
+            if index != 0:
+                parent_obj = items[path.dirname(segment_path)]
+
+            subdir_obj = DirListing(segment)
+            parent_obj.add_subdir(subdir_obj)
+
+            items[segment_path] = subdir_obj
+
     # XXX: Not thread safe when uninitialized
     @property
     def members(self):
@@ -495,8 +514,9 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
             if not dir_name:
                 dir_name = None
 
-            assert dir_name in items.keys(), \
-                   'Unable to find parent folder of: %s' % filename
+            # Create the missing structure if needed
+            if dir_name not in items.keys():
+                self._create_dir_structure_to(items, dir_name)
 
             current_dir = items[dir_name]
             file_obj = self._add_listing_object(current_dir, 'add_file',
@@ -510,6 +530,22 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
 
         return self._items
 
+    def _expand_children(self, root, extraction_path):
+        file_obj = self.members[root]
+
+        super()._acquire_lock()
+        # Implicit fallthrough for links to regular logic
+        if not path.exists(extraction_path):
+            makedirs(extraction_path, exist_ok = True)
+        super()._release_lock()
+
+        for item in file_obj.dirs + file_obj.files:
+            internal_path = item.name
+            if root != None:
+                internal_path = path.join(root, item.name)
+
+            self.expand(internal_path, extraction_path)
+
     def expand(self, root, extraction_path):
         assert root in self.members, \
                'Unknown member path specified: %s' % root
@@ -517,15 +553,7 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
         file_obj = self.members[root]
 
         if not root:
-            super()._acquire_lock()
-            # Implicit fallthrough for links to regular logic
-            if not path.exists(extraction_path):
-                makedirs(extraction_path, exist_ok = True)
-            super()._release_lock()
-
-            for item in file_obj.dirs + file_obj.files:
-                self.expand(item.name, path.join(extraction_path))
-
+            self._expand_children(None, extraction_path)
             return
 
         member = None
@@ -534,14 +562,17 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
         else:
             # This is for folders that are returned by list_items which
             # don't have a matching folder within the archive
-            folder_path = path.join(sef.extraction_path, root)
+            folder_path = path.join(extraction_path, root)
 
             super()._acquire_lock()
             if not path.isdir(folder_path):
                 makedirs(folder_path, exist_ok = True)
             super()._release_lock()
 
+            self._expand_children(root, extraction_path)
+
             # TODO: Move this to end of extraction
+            # XXX: Does not do anything right now
             if member:
                 chmod(folder_path, file_obj.mode, follow_symlinks = False)
                 utime(folder_path, (member.mtime, member.mtime),

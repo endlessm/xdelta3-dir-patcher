@@ -110,6 +110,29 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
 
             self.assertEquals(b'new file content\n', actual_content)
 
+    def test_can_extract_members_correctly_that_lack_hierarchy(self):
+        archive = self.get_archive('missing_hierarchy')
+
+        with self.test_class(archive) as test_object:
+            int_path = 'foo/bar/baz/foo/bar/baz/test.txt'
+            test_object.expand(int_path, self.temp_dir)
+            actual_content = TestHelpers.get_content(path.join(self.temp_dir,
+                                                               *int_path.split(path.sep)))
+
+            self.assertEquals(b'new file content\n', actual_content)
+
+    def test_can_extract_inserted_dir_hierarchy(self):
+        archive = self.get_archive('missing_hierarchy')
+
+        with self.test_class(archive) as test_object:
+            int_path = 'foo/bar/baz/foo/bar'
+            full_path = 'foo/bar/baz/foo/bar/baz/test.txt'
+            test_object.expand(int_path, self.temp_dir)
+            actual_content = TestHelpers.get_content(path.join(self.temp_dir,
+                                                               *full_path.split(path.sep)))
+
+            self.assertEquals(b'new file content\n', actual_content)
+
     def test_can_be_manually_opened_and_closed(self):
         archive = self.get_archive('new_version1')
 
