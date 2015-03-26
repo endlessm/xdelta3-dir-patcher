@@ -19,12 +19,14 @@
 #   USA
 
 import argparse
-import tarfile
-import zipfile
-import random
 import logging
+import operator
+import random
+import tarfile
 import time
 import threading
+import zipfile
+
 import multiprocessing
 import concurrent.futures
 
@@ -34,7 +36,7 @@ from sys import stderr, stdout
 from io import StringIO
 from tempfile import mkdtemp
 from subprocess import check_output, STDOUT, CalledProcessError
-from shutil import copymode, copystat, copyfile, copy2, rmtree, copytree
+from shutil import copymode, copystat, copyfile, copytree, copy2, rmtree
 from os import chmod, chown, cpu_count, geteuid, listdir, lstat, makedirs, mkdir
 from os import O_NOFOLLOW, O_RDONLY, path, readlink, remove, rmdir, symlink, sep
 from os import stat, utime, walk
@@ -64,7 +66,9 @@ class DirListing(object):
 
         self.name = name
 
-    def set_metadata(self, name, data, permissions, uname, uid, gname, gid, is_link):
+    def set_metadata(self, name, data, permissions, uname, uid, gname, gid,
+                     is_link,
+                     link_target = None):
         self.name = name
         self.data = data
         self.permissions = permissions
@@ -73,6 +77,7 @@ class DirListing(object):
         self.gname = gname
         self.gid = gid
         self.is_link = is_link
+        self.link_target = link_target
 
     @property
     def dirs(self):
@@ -87,7 +92,9 @@ class DirListing(object):
 
         self._dirs.append(subdir)
 
-    def add_file(self, name, data, permissions, uname, uid, gname, gid, is_link):
+    def add_file(self, name, data, permissions, uname, uid, gname, gid,
+                 is_link,
+                 link_target = None):
         file_dict = { 'name': name, 'permissions': permissions, 'data': data,
                       'uname': uname,
                       'uid': uid,
@@ -95,7 +102,8 @@ class DirListing(object):
                       'gid': gid,
                       'is_link': is_link,
                       'is_file': True,
-                      'is_dir': False }
+                      'is_dir': False,
+                      'link_target': link_target }
 
         self._files.append(AttributeDict(file_dict))
 
@@ -116,15 +124,18 @@ class DirListing(object):
                 permissions += letter if mask & file_obj.permissions else '-'
             permissions += ')'
 
-        is_link = ' ↝' if file_obj.is_link else ''
+        is_link = '-> %s' % file_obj.link_target if file_obj.is_link else ''
 
-        output_str = '%s%s %s' % (permissions, is_link, output_str)
+        output_str = '%s %s %s' % (permissions, output_str, is_link)
         return output_str
 
     def _print_dir_listing(self, root, output, root_path = ""):
+        assert root and root.name, \
+                'Cannot print listing in path: \'%s\'' % root_path
+
         relative_path = path.join(root_path, root.name)
         padding = relative_path.count(path.sep)
-        is_link = ' ↝' if root.is_link else ''
+        is_link = '-> %s' % root.link_target if root.is_link else ''
 
         print('| ' * padding +  '⇩', relative_path, is_link, file = output)
 
@@ -257,14 +268,19 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
 
         setter_func = getattr(dir_listing, method)
 
-        return setter_func(path.basename(absolute_path),
-                           absolute_path,
-                           mode,
-                           getpwuid(uid)[0],
-                           uid,
-                           getgrgid(gid)[0],
-                           gid,
-                           path.islink(absolute_path))
+        file_obj = setter_func(path.basename(absolute_path),
+                               absolute_path,
+                               mode,
+                               getpwuid(uid)[0],
+                               uid,
+                               getgrgid(gid)[0],
+                               gid,
+                               path.islink(absolute_path))
+
+        if file_obj and file_obj.is_link:
+            file_obj.link_target = readlink(absolute_path)
+
+        return file_obj
 
     @property
     def members(self):
@@ -319,7 +335,8 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
             makedirs(directory, exist_ok = True)
 
     def expand(self, root, extraction_path):
-        assert root in self.members, 'Unknown member path specified'
+        assert root in self.members, \
+               'Unknown member path specified: %s' % root
 
         root_obj = self.members[root]
 
@@ -337,7 +354,7 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
             source_path = path.abspath(source_path)
             target_path = path.abspath(target_path)
 
-            symlink(readlink(source_path), target_path)
+            symlink(root_obj.link_target, target_path)
         elif root_obj.is_file:
             self._makedirs_with_check(dir_path)
             copy2(source_path, target_path, follow_symlinks = False)
@@ -350,7 +367,8 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
             copystat(source_path, target_path)
 
             try:
-                chown(target_path, root_obj.uid, root_obj.gid)
+                chown(target_path, root_obj.uid, root_obj.gid,
+                      follow_symlinks = False)
             except PermissionError as pe:
                 # XXX: We can't copy the uid/gid unless we're run as root
                 #      which means that in most cases we can't get that 
@@ -374,7 +392,7 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
     def __init__(self, archive_path, for_writing = False):
         super().__init__()
 
-        self.items = None
+        self._items = None
         flags = 'r:*'
 
         if for_writing:
@@ -384,6 +402,7 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
             flags = 'w:%s' % self.TAR_FORMAT
 
         self.archive_object = tarfile.open(archive_path, flags)
+        self.archive_name = path.basename(archive_path)
 
     def _close_archive(self):
         self.archive_object.close()
@@ -401,101 +420,146 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
     def can_open(archive):
         return path.isfile(archive) and tarfile.is_tarfile(archive)
 
-    def list_files(self):
-        if self.items:
-            return self.items
+    def _add_listing_object(self, dir_listing, method, member):
+        setter_func = getattr(dir_listing, method)
 
-        items = []
+        file_obj = setter_func(path.basename(member.name),
+                               member,
+                               member.mode,
+                               member.uname,
+                               member.uid,
+                               member.gname,
+                               member.gid,
+                               member.issym())
+
+        if file_obj and file_obj.is_link:
+            file_obj.link_target = member.linkname
+
+        return file_obj
+
+
+    @property
+    def members(self):
+        if self._items:
+            return self._items
+
+        super()._acquire_lock()
 
         print('Tar: Gathering filelist')
         members = self.archive_object.getmembers()
 
-        # Lookup all member objects
+        # Lookup all member objects. Order is not ensured so we
+        # need to do a 2-pass run to assign the proper hierarchy
+        # to DirListing objects and files
+        folders = []
+        files = []
         for member in members:
-            # For directories, add a separator to the end
-            suffix = path.sep if member.isdir() else ''
+            if member.isdir():
+                folders.append((member.name, member))
+            else:
+                files.append((member.name, member))
 
-            items.append('%s%s' % (member.name, suffix))
+        # Sort the directories - we want to navigate from trunk to leaf nodes
+        sorted_dirs = sorted(folders, key = lambda f: len(f[0]))
 
-        # Append any directories that weren't part of the archive
-        for item in items:
-            dir_name = path.dirname(item) + path.sep
-            if len(dir_name) > 1 and not dir_name in items:
-                print('Post-adding %s to members' % dir_name)
-                items.append(dir_name)
+        # Create the folder structure
+        items = { None: DirListing(self.archive_name) }
+        for folder, member in sorted_dirs:
+            parent_dir = path.dirname(folder)
+            if not parent_dir:
+                parent_dir = None
+            current_dir = DirListing()
+
+            self._add_listing_object(current_dir, 'set_metadata',
+                                     member)
+
+            items[folder] = current_dir
+
+            if parent_dir in items:
+                items[parent_dir].add_subdir(current_dir)
+
+        # Add files to dirs
+        for filename, member in files:
+            dir_name = path.dirname(filename)
+            if not dir_name:
+                dir_name = None
+
+            assert dir_name in items.keys(), \
+                   'Unable to find parent folder of: %s' % filename
+
+            current_dir = items[dir_name]
+            file_obj = self._add_listing_object(current_dir, 'add_file',
+                                                member)
+
+            items[filename] = file_obj
 
         print('Tar: Gathering completed')
+        print(items[None])
 
-        self.items = items
+        self._items = items
 
-        return self.items
+        super()._release_lock()
 
-    def expand(self, filename, extraction_path):
+        return self._items
+
+    def list_items(self):
+        return self.members
+
+    def expand(self, root, extraction_path):
+        assert root in self.members, \
+               'Unknown member path specified: %s' % root
+
+        file_obj = self.members[root]
+
+        if not root:
+            super()._acquire_lock()
+            # Implicit fallthrough for links to regular logic
+            if not path.exists(extraction_path):
+                makedirs(extraction_path, exist_ok = True)
+            super()._release_lock()
+
+            for item in file_obj.dirs + file_obj.files:
+                self.expand(item.name, extraction_path)
+
+            return
+
+        filename = root
+
         member = None
-        try:
-            member = self.archive_object.getmember(filename)
-        except KeyError as key_error:
-            if filename.endswith(path.sep):
-                # This is for folders that are returned by list_files which
-                # don't have a matching folder within the archive
-                ghost_entry = False
-                is_link = False
+        if file_obj.data:
+            member = file_obj.data
+        else:
+            # This is for folders that are returned by list_files which
+            # don't have a matching folder within the archive
+            folder_path = path.join(sef.extraction_path, root)
+
+            super()._acquire_lock()
+            if not path.isdir(folder_path):
+                makedirs(folder_path, exist_ok = True)
+            super()._release_lock()
+
+            # TODO: Move this to end of extraction
+            if member:
+                chmod(folder_path, file_obj.mode, follow_symlinks = False)
+                utime(folder_path, (member.mtime, member.mtime),
+                      follow_symlinks = False)
 
                 try:
-                    folder_member_name = filename.rstrip(path.sep)
-                    member = self.archive_object.getmember(folder_member_name)
+                    chown(folder_path, file_obj.uid, file_obj.gid,
+                          follow_symlinks = False)
+                except PermissionError as pe:
+                    pass
 
-                    if member.islnk():
-                        is_link = True
-                except KeyError as key_error:
-                    # XXX: For now we don't care about showing this output
-                    #      to users
-                    # print('No folder \'%s\'. Assuming its added as a placeholder' %
-                    #       filename)
+            return
 
-                    ghost_entry = True
-
-                folder_path = path.join(extraction_path,
-                                        filename)
-
-                # If it's a placeholder dir entry, we just create it
-                if ghost_entry:
-                    super()._acquire_lock()
-                    makedirs(folder_path, exist_ok = True)
-                    super()._release_lock()
-                    return
-
-                # If we're netiher ghost dir, a link, nor a dir
-                # exit with an error
-                if not is_link and not member.isdir():
-                    raise RuntimeError('Non directory member found')
-
-                # For explicitly saved directories, we createe it
-                if not is_link:
-                    # If the foldere isn't there, creat it (locked)
-                    if not path.exists(folder_path):
-                        super()._acquire_lock()
-                        makedirs(folder_path, exist_ok = True)
-                        super()._release_lock()
-
-                    # TODO: Test me
-                    # Copy its permissions/stat/mode to the target
-                    # (but don't expand it)
-                    if member:
-                        chmod(folder_path, member.mode)
-                        utime(folder_path, (member.mtime, member.mtime))
-
-                        try:
-                            chown(folder_path, member.uid, member.gid)
-                        except PermissionError as pe:
-                            pass
-
-                        return
-
-                # Implicit fallthrough for links to regular logic
-
+        # Implicit fallthrough for links to regular logic
         if not path.exists(extraction_path):
             makedirs(extraction_path, exist_ok = True)
+
+        # Manually handle symlinks
+        if file_obj.is_link:
+            symlink(file_obj.link_target, path.join(extraction_path, filename))
+            return
 
         # XXX: Not thread safe http://bugs.python.org/issue23649
         super()._acquire_lock()
@@ -611,13 +675,14 @@ class XDelta3ZipImpl(XDelta3AbstractArchiveImpl):
     def list_items(self):
         return self.members
 
-    def expand(self, filename, extraction_path):
-        assert filename in self.members
+    def expand(self, root, extraction_path):
+        assert root in self.members, \
+               'Unknown member path specified: %s' % root
 
         if not path.isdir(extraction_path):
             makedirs(extraction_path, exist_ok = True)
 
-        self.archive_object.extract(self.members[filename].data,
+        self.archive_object.extract(self.members[root].data,
                                     extraction_path)
 
     def create(self, base_dir):
@@ -705,7 +770,7 @@ class XDelta3DirPatcher(object):
         uid = stat(src_file).st_uid
         gid = stat(src_file).st_gid
 
-        chown(dest_file,uid,gid)
+        chown(dest_file, uid,gid, follow_symlinks = False)
 
     def _find_file_delta(self, filename, old_archive_obj, new_archive_obj,
                           old_root,

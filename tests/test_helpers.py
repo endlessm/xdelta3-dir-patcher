@@ -19,7 +19,8 @@ class TestHelpers(object):
                     test_class.assertEquals(readlink(first_file),
                                       readlink(second_file))
                 else:
-                    test_class.fail('common_funny files was not empty!')
+                    test_class.fail('common_funny files was not empty!' \
+                                    '\n%s != %s' % (first_file, second_file))
 
         test_class.assertEquals([], diff.left_only)
         test_class.assertEquals([], diff.right_only)

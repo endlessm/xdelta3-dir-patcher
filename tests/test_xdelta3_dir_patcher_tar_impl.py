@@ -54,16 +54,6 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
     def get_archive(self, name):
         return path.join(self.TEST_FILE_PREFIX, '%s.tgz' % name)
 
-    def expected_new_version1_members(self):
-        return ['binary_file',
-                'long_lorem.txt',
-                'new folder/',
-                'new folder/new file1.txt',
-                'short_lorem.txt',
-                'updated folder/',
-                'updated folder/updated file.txt',
-                'updated folder/.hidden_updated_file.txt']
-
     def test_can_open_works(self):
         prefix = path.join('tests', 'test_files', 'archive_instance')
         file_pattern = path.join(prefix, 'old_version1%s')
@@ -76,13 +66,8 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
     def test_can_list_members_correctly(self):
         archive = self.get_archive('new_version1')
         with self.test_class(archive) as test_object:
-            actual_members = test_object.list_files()
-
-            self.assertEquals(len(self.expected_new_version1_members()),
-                              len(actual_members))
-
-            for member in self.expected_new_version1_members():
-                self.assertIn(member, actual_members)
+            TestHelpers.verify_new_version1_members(self, patcher,
+                                                    test_object.list_items())
 
     def test_list_members_is_cached(self):
         orig_archive = self.get_archive('new_version1')
@@ -91,20 +76,15 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
 
         with self.test_class(archive) as test_object:
             # Force a load of the index
-            initial_members = test_object.list_files()
-            self.assertEquals(len(self.expected_new_version1_members()),
-                              len(initial_members))
+            TestHelpers.verify_new_version1_members(self, patcher,
+                                                    test_object.list_items())
 
             # Remove the archive
             remove(archive)
 
             # Test invocation
-            actual_members = test_object.list_files()
-
-            self.assertEquals(len(self.expected_new_version1_members()),
-                              len(actual_members))
-            for member in self.expected_new_version1_members():
-                self.assertIn(member, actual_members)
+            TestHelpers.verify_new_version1_members(self, patcher,
+                                                    test_object.list_items())
 
     def test_can_extract_members_correctly(self):
         archive = self.get_archive('new_version1')
@@ -180,8 +160,7 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
             test_object.create(source_dir)
 
         with self.test_class(archive) as test_object:
-            for item in test_object.list_files():
-                test_object.expand(item, self.temp_dir2)
+            test_object.expand(None, self.temp_dir2)
 
         TestHelpers.compare_trees(self, source_dir, self.temp_dir2)
 
@@ -195,7 +174,8 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
 
         with self.test_class(archive) as test_object:
             # Force a load of the index
-            initial_members = test_object.list_files()
+            initial_members = test_object.list_items()
+            initial_members.pop(None)
 
             for member in initial_members:
                 for i in range(0, 10):

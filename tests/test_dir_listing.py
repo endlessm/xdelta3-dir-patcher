@@ -44,6 +44,7 @@ class TestDirListing(unittest.TestCase):
     # Helpers
     def add_mock_file(self, test_object, version):
         data = FakeMember(version)
+        link_target = "target%s" % version if (version % 2 == 0) else None
         return test_object.add_file("name%s" % version,
                                     data,
                                     1 + version,
@@ -51,7 +52,8 @@ class TestDirListing(unittest.TestCase):
                                     10 + version,
                                     "groupname%s" % version,
                                     100 + version,
-                                    version % 2 == 0)
+                                    version % 2 == 0,
+                                    link_target)
 
     def verify_mock_files(self, test_object, versions):
         self.assertEqual(len(versions), len(test_object.files))
@@ -66,6 +68,8 @@ class TestDirListing(unittest.TestCase):
             self.assertEquals(file_obj.gname, "groupname%s" % version)
             self.assertEquals(file_obj.gid, 100 + version)
             self.assertEquals(file_obj.is_link, version % 2 == 0)
+            if file_obj.is_link:
+                file_obj.link_target = "target%s" % version
             self.assertEquals(file_obj.data.version, version)
 
             self.assertEquals(file_obj.is_file, True)
