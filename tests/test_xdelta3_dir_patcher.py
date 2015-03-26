@@ -175,6 +175,8 @@ class TestXDelta3DirPatcher(unittest.TestCase):
                                    new_path,
                                    generated_delta_path])
 
+        print('-' * 70)
+
         TestHelpers.check_output2(["./%s" % self.EXECUTABLE,
                                    "--debug",
                                    "apply",

@@ -456,7 +456,7 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
         if self._items:
             return self._items
 
-        print('Tar: Gathering filelist')
+        print('Tar: Gathering filelist (%s)' % self.archive_name)
         members = self.archive_object.getmembers()
 
         # Lookup all member objects. Order is not ensured so we
@@ -504,7 +504,7 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
 
             items[filename] = file_obj
 
-        print('Tar: Gathering completed')
+        print('Tar: Gathering completed (%s)' % self.archive_name)
 
         self._items = items
 
@@ -524,11 +524,9 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
             super()._release_lock()
 
             for item in file_obj.dirs + file_obj.files:
-                self.expand(item.name, extraction_path)
+                self.expand(item.name, path.join(extraction_path))
 
             return
-
-        filename = root
 
         member = None
         if file_obj.data:
@@ -563,15 +561,21 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
 
         # Manually handle symlinks
         if file_obj.is_link:
-            symlink(file_obj.link_target, path.join(extraction_path, filename))
+            symlink(file_obj.link_target, path.join(extraction_path, root))
             return
-
-        # XXX: Not thread safe http://bugs.python.org/issue23649
-        super()._acquire_lock()
-        try:
-            self.archive_object.extract(member, extraction_path)
-        finally:
+        elif file_obj.is_dir:
+            target_dir = path.join(extraction_path, root)
+            super()._acquire_lock()
+            if not path.exists(target_dir):
+                makedirs(target_dir, exist_ok = True)
             super()._release_lock()
+        else:
+            # XXX: Not thread safe http://bugs.python.org/issue23649
+            super()._acquire_lock()
+            try:
+                self.archive_object.extract(member, extraction_path)
+            finally:
+                super()._release_lock()
 
     def create(self, base_dir):
         for item in listdir(base_dir):
@@ -642,7 +646,7 @@ class XDelta3ZipImpl(XDelta3AbstractArchiveImpl):
 
         items = {}
 
-        print('Zip: Gathering filelist')
+        print('Zip: Gathering filelist (%s)' % path.basename(self.archive_path))
 
         # Sorted to ensure that we do top-down traversal
         sorted_names = sorted(self.archive_object.namelist(),
@@ -674,7 +678,7 @@ class XDelta3ZipImpl(XDelta3AbstractArchiveImpl):
                 file_obj = self._add_listing_object(dir_listing, 'add_file', name)
                 items[name] = file_obj
 
-        print('Zip: Gathering completed')
+        print('Zip: Gathering completed (%s)' % path.basename(self.archive_path))
 
         # Intentional separation of variables so that we don't assign
         # some garbage value to self.items as well as print out the debug
@@ -818,8 +822,7 @@ class XDelta3DirPatcher(object):
             if not path.exists(target_dir):
                 makedirs(target_dir, exist_ok = True)
 
-            self.copy_attributes(new_path, target_path)
-
+            self.copy_attributes(new_path, target_dir)
         else:
             if not path.exists(target_dir):
                 makedirs(target_dir, exist_ok = True)
@@ -1004,18 +1007,14 @@ class XDelta3DirPatcher(object):
             print("  - Please ensure that the toplevel target dir has the correct permissions.")
             makedirs(target_dir)
 
-        print('Enumerating old files')
-        old_files = []
-        with XDeltaArchive(old_dir) as old_archive:
-            old_files = old_archive.list_items()
-        if self.args.verbose: print("Old: %s" % old_files)
-
         print('Applying patches from %s' % patch_bundle)
-        with XDeltaArchive(patch_bundle) as patch_archive:
+        with XDeltaArchive(old_dir) as old_archive, \
+             XDeltaArchive(patch_bundle) as patch_archive:
             all_archive_items = patch_archive.list_items().keys()
+
             if self.args.verbose: print("All in patch: %s" % all_archive_items)
 
-            patches = [p for p in all_archive_items if p.startswith(delta_patch_root)]
+            patches = [p for p in all_archive_items if p and p.startswith(delta_patch_root)]
             if self.args.verbose: print("Patches: %s" % patches)
 
             # XXX: We need to strip out the internal path prefix on the patches
@@ -1030,7 +1029,10 @@ class XDelta3DirPatcher(object):
 
             if self.args.verbose: print("In patch: %s" % files_in_patch)
 
-            removed_items = [f for f in old_files if f not in files_in_patch]
+            removed_items = []
+            for old_file in old_archive.list_items().keys():
+                if old_file and old_file not in files_in_patch:
+                    removed_items.append(old_file)
 
             # XXX: This is to ensure that we never try to remove a directory while
             #      all of its children are in queue waiting for a thread (causing
