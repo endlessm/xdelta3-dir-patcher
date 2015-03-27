@@ -923,8 +923,9 @@ class XDelta3DirPatcher(object):
 
             # Regular file
             if not path.isfile(old_path):
+                if args.debug: print("File missing: \'%s\'." \
+                                     "Ignoring source in XDelta" % old_path)
                 old_path = None
-                if args.debug: print("Old file not present. Ignoring source in XDelta")
 
             self.delta_impl.apply(old_path, patch_path, target_path, self.args.debug)
 
@@ -939,7 +940,7 @@ class XDelta3DirPatcher(object):
         target_dir = mkdtemp(prefix='%s_target' % XDelta3DirPatcher.__name__,
                              dir=staging_dir)
 
-        print("Using %s as staging area" % target_dir)
+        print("Using \'%s\' as staging area" % target_dir)
         stdout.flush()
 
         delta_target_dir = path.join(target_dir, self.PATCH_FOLDER)
@@ -1035,7 +1036,7 @@ class XDelta3DirPatcher(object):
         # Create a temp dir
         patch_staging_dir = mkdtemp(prefix='%s_delta_expanded' % XDelta3DirPatcher.__name__,
                                     dir=staging_dir)
-        print("Using %s as staging area" % patch_staging_dir)
+        print("Using \'%s\' as staging area" % patch_staging_dir)
 
         # If we want to apply only a part of the xdelta files
         # from withing the delta bundle xdelta/ folder
@@ -1084,8 +1085,9 @@ class XDelta3DirPatcher(object):
 
             if self.args.verbose: print("Removed: %s" % removed_items)
 
-            print("Removing deleted files")
+            # TODO: Verify that old archive has the expected files before we start
 
+            print("Removing deleted files")
             for removed_item in removed_items:
                 if self.args.debug:
                     print('Queueing(rm) \'%s\'' % removed_item)
