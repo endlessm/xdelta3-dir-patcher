@@ -30,9 +30,8 @@ class TestDirListing(unittest.TestCase):
     class FakeSubdir(patcher.DirListing):
         def __init__(self, version):
             super().__init__()
-            self.version = version
 
-            self.__class__ = super().__class__
+            self.version = version
 
     class FakeMember(object):
         def __init__(self, version):
@@ -127,19 +126,6 @@ class TestDirListing(unittest.TestCase):
 
         self.assertEqual(len(expected_subdirs), len(test_object.dirs))
         self.assertEqual(expected_subdirs, test_object.dirs)
-
-    def test_adding_dirs_only_accepts_dir_listing_class(self):
-        test_object = self.test_class()
-
-        class Foo(object):
-            pass
-
-        try:
-            test_object.add_subdir(Foo())
-        except AssertionError:
-            pass
-        else:
-            self.fail('Did not reject unknown subdir class')
 
     def test_set_object_attributes_works(self):
         test_object = self.test_class()
