@@ -30,12 +30,12 @@ from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH
 
 from .test_helpers import TestHelpers
 
-# Dashes are standard for exec scipts but not allowed for modules in Python. We
-# use the script standard since we will be running that file as a script most
-# often.
-patcher = imp.load_source("xdelta3-dir-patcher", "xdelta3-dir-patcher")
-
 class TestXDelta3DirPatcher(unittest.TestCase):
+    # Dashes are standard for exec scipts but not allowed for modules in Python. We
+    # use the script standard since we will be running that file as a script most
+    # often.
+    patcher = imp.load_source("xdelta3-dir-patcher", "xdelta3-dir-patcher")
+
     EXECUTABLE="xdelta3-dir-patcher"
     TEST_FILE_PREFIX = path.join('tests', 'test_files', 'dir_patcher')
 
@@ -45,8 +45,8 @@ class TestXDelta3DirPatcher(unittest.TestCase):
         self.temp_dir2 = mkdtemp(prefix="%s_" % self.__class__.__name__)
         chmod(self.temp_dir2, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
 
-        self.test_class = patcher.XDelta3DirPatcher
-        self.xdelta_test_class = patcher.XDelta3Impl
+        self.test_class = self.patcher.XDelta3DirPatcher
+        self.xdelta_test_class = self.patcher.XDelta3Impl
 
     def tearDown(self):
         rmtree(self.temp_dir)
@@ -445,7 +445,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
     # Unit tests
     def test_run_calls_diff_with_correct_arguments_if_action_is_diff(self):
-        args = patcher.AttributeDict()
+        args = self.patcher.AttributeDict()
         args.action = 'diff'
         args.old_version = 'old'
         args.new_version = 'new'
@@ -464,7 +464,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
                                                  'staging_dir')
 
     def test_run_calls_apply_with_correct_arguments_if_action_is_apply(self):
-        args = patcher.AttributeDict()
+        args = self.patcher.AttributeDict()
         args.action = 'apply'
         args.old_dir = 'old'
         args.patch_bundle = 'patch'
@@ -482,7 +482,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
                                                   None, 'foo')
 
     def test_run_calls_apply_with_correct_arguments_if_action_is_apply_and_root_is_specified(self):
-        args = patcher.AttributeDict()
+        args = self.patcher.AttributeDict()
         args.action = 'apply'
         args.old_dir = 'old'
         args.patch_bundle = 'patch'
@@ -501,7 +501,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
                                                   'bar')
 
     def test_run_calls_apply_with_correct_arguments_if_action_is_apply_and_no_target_specified(self):
-        args = patcher.AttributeDict()
+        args = self.patcher.AttributeDict()
         args.action = 'apply'
         args.old_dir = 'old'
         args.patch_bundle = 'patch'
@@ -558,7 +558,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
                 self.xdelta_test_class().diff(old_file, new_file, target_file,
                                               debug)
 
-        args = patcher.AttributeDict()
+        args = self.patcher.AttributeDict()
         args.action = 'diff'
         args.debug = True
         args.verbose = True

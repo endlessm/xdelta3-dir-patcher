@@ -23,14 +23,14 @@ from mock import Mock
 from time import sleep
 from os import cpu_count
 
-# Dashes are standard for exec scipts but not allowed for modules in Python. We
-# use the script standard since we will be running that file as a script most
-# often.
-patcher = imp.load_source("xdelta3-dir-patcher", "xdelta3-dir-patcher")
-
 class TestExecutorRunner(unittest.TestCase):
+    # Dashes are standard for exec scipts but not allowed for modules in Python. We
+    # use the script standard since we will be running that file as a script most
+    # often.
+    patcher = imp.load_source("xdelta3-dir-patcher", "xdelta3-dir-patcher")
+
     def setUp(self):
-        self.test_class = patcher.ExecutorRunner
+        self.test_class = self.patcher.ExecutorRunner
 
     def tearDown(self):
         pass

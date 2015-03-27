@@ -28,12 +28,12 @@ from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH
 
 from .test_helpers import TestHelpers
 
-# Dashes are standard for exec scipts but not allowed for modules in Python. We
-# use the script standard since we will be running that file as a script most
-# often.
-patcher = imp.load_source("xdelta3-dir-patcher", "xdelta3-dir-patcher")
-
 class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
+    # Dashes are standard for exec scipts but not allowed for modules in Python. We
+    # use the script standard since we will be running that file as a script most
+    # often.
+    patcher = imp.load_source("xdelta3-dir-patcher", "xdelta3-dir-patcher")
+
     TEST_FILE_PREFIX = path.join('tests', 'test_files', 'zip_impl')
 
     def setUp(self):
@@ -42,7 +42,7 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
         self.temp_dir2 = mkdtemp(prefix="%s_" % self.__class__.__name__)
         chmod(self.temp_dir2, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
 
-        self.test_class = patcher.XDelta3ZipImpl
+        self.test_class = self.patcher.XDelta3ZipImpl
 
     def tearDown(self):
         rmtree(self.temp_dir)
@@ -65,7 +65,7 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
         archive = self.get_archive('new_version1')
         with self.test_class(archive) as test_object:
             TestHelpers.verify_new_version1_members(self,
-                                                    patcher,
+                                                    self.patcher,
                                                     test_object.list_items())
 
     def test_list_members_is_cached(self):
@@ -76,7 +76,7 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
         with self.test_class(archive) as test_object:
             # Force a load of the index
             TestHelpers.verify_new_version1_members(self,
-                                                    patcher,
+                                                    self.patcher,
                                                     test_object.list_items())
 
             # Remove the archive
@@ -84,7 +84,7 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
 
             # Test invocation
             TestHelpers.verify_new_version1_members(self,
-                                                    patcher,
+                                                    self.patcher,
                                                     test_object.list_items())
 
     def test_list_members_is_cached_on_load(self):
@@ -97,7 +97,7 @@ class TestXDelta3DirPatcherZipImpl(unittest.TestCase):
 
             # Force a load of the index
             TestHelpers.verify_new_version1_members(self,
-                                                    patcher,
+                                                    self.patcher,
                                                     test_object.list_items())
 
     def test_can_extract_members_correctly(self):

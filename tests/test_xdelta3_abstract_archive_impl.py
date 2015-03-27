@@ -22,12 +22,12 @@ import unittest
 from mock import Mock
 from time import sleep
 
-# Dashes are standard for exec scipts but not allowed for modules in Python. We
-# use the script standard since we will be running that file as a script most
-# often.
-patcher = imp.load_source("xdelta3-dir-patcher", "xdelta3-dir-patcher")
-
 class TestXDelta3AbstractArchiveImp(unittest.TestCase):
+    # Dashes are standard for exec scipts but not allowed for modules in Python. We
+    # use the script standard since we will be running that file as a script most
+    # often.
+    patcher = imp.load_source("xdelta3-dir-patcher", "xdelta3-dir-patcher")
+
     class MockArchiveImpl(patcher.XDelta3AbstractArchiveImpl):
         def __init__(self, test_class):
             super().__init__()
@@ -37,7 +37,7 @@ class TestXDelta3AbstractArchiveImp(unittest.TestCase):
             return "abc"
 
     def setUp(self):
-        self.test_class = patcher.XDelta3AbstractArchiveImpl
+        self.test_class = self.patcher.XDelta3AbstractArchiveImpl
 
     def tearDown(self):
         pass

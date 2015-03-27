@@ -29,12 +29,12 @@ from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH, S_IMODE
 
 from .test_helpers import TestHelpers
 
-# Dashes are standard for exec scipts but not allowed for modules in Python. We
-# use the script standard since we will be running that file as a script most
-# often.
-patcher = imp.load_source("xdelta3-dir-patcher", "xdelta3-dir-patcher")
-
 class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
+    # Dashes are standard for exec scipts but not allowed for modules in Python. We
+    # use the script standard since we will be running that file as a script most
+    # often.
+    patcher = imp.load_source("xdelta3-dir-patcher", "xdelta3-dir-patcher")
+
     ALLOW_PERMISSION_TESTS = True
 
     TEST_FILE_PREFIX = path.join('tests', 'test_files', 'fs_impl')
@@ -46,7 +46,7 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
         self.temp_dir2 = mkdtemp(prefix="%s_" % self.__class__.__name__)
         chmod(self.temp_dir2, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
 
-        self.test_class = patcher.XDelta3FsImpl
+        self.test_class = self.patcher.XDelta3FsImpl
 
     def tearDown(self):
         rmtree(self.temp_dir)
@@ -70,7 +70,7 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
             actual_members = test_object.list_items()
 
             TestHelpers.verify_new_version1_members(self,
-                                                    patcher,
+                                                    self.patcher,
                                                     test_object.list_items())
 
     def test_list_members_is_cached(self):
@@ -82,7 +82,7 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
         with self.test_class(archive) as test_object:
             # Force a load of the index
             TestHelpers.verify_new_version1_members(self,
-                                                    patcher,
+                                                    self.patcher,
                                                     test_object.list_items())
 
             # Remove the archive
@@ -90,7 +90,7 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
 
             # Test invocation
             TestHelpers.verify_new_version1_members(self,
-                                                    patcher,
+                                                    self.patcher,
                                                     test_object.list_items())
 
     def test_list_members_is_cached_on_load(self):
@@ -104,7 +104,7 @@ class TestXDelta3DirPatcherFsImpl(unittest.TestCase):
 
             # Force a load of the index
             TestHelpers.verify_new_version1_members(self,
-                                                    patcher,
+                                                    self.patcher,
                                                     test_object.list_items())
 
     def test_can_extract_files_correctly(self):

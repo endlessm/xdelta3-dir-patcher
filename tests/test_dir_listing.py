@@ -21,29 +21,32 @@ import unittest
 
 from mock import Mock
 
-# Dashes are standard for exec scipts but not allowed for modules in Python. We
-# use the script standard since we will be running that file as a script most
-# often.
-patcher = imp.load_source("xdelta3-dir-patcher", "xdelta3-dir-patcher")
-
-class FakeSubdir(patcher.DirListing):
-    def __init__(self, version):
-        self.version = version
-
-class FakeMember(object):
-    def __init__(self, version):
-        self.version = version
-
 class TestDirListing(unittest.TestCase):
+    # Dashes are standard for exec scipts but not allowed for modules in Python. We
+    # use the script standard since we will be running that file as a script most
+    # often.
+    patcher = imp.load_source("xdelta3-dir-patcher", "xdelta3-dir-patcher")
+
+    class FakeSubdir(patcher.DirListing):
+        def __init__(self, version):
+            super().__init__()
+            self.version = version
+
+            self.__class__ = super().__class__
+
+    class FakeMember(object):
+        def __init__(self, version):
+            self.version = version
+
     def setUp(self):
-        self.test_class = patcher.DirListing
+        self.test_class = self.patcher.DirListing
 
     def tearDown(self):
         pass
 
     # Helpers
     def add_mock_file(self, test_object, version):
-        data = FakeMember(version)
+        data = self.FakeMember(version)
         link_target = "target%s" % version if (version % 2 == 0) else None
         return test_object.add_file("name%s" % version,
                                     data,
@@ -114,8 +117,8 @@ class TestDirListing(unittest.TestCase):
     def test_adding_dirs_works(self):
         test_object = self.test_class()
 
-        subdir1 = FakeSubdir(1)
-        subdir2 = FakeSubdir(2)
+        subdir1 = self.FakeSubdir(1)
+        subdir2 = self.FakeSubdir(2)
 
         expected_subdirs = [ subdir1, subdir2 ]
 
@@ -141,7 +144,7 @@ class TestDirListing(unittest.TestCase):
     def test_set_object_attributes_works(self):
         test_object = self.test_class()
 
-        data = FakeMember(999)
+        data = self.FakeMember(999)
 
         test_object.set_metadata("name",
                                  data,
