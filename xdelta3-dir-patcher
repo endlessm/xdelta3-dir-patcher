@@ -89,7 +89,7 @@ class DirListing(object):
         return self._files
 
     def add_subdir(self, subdir):
-        assert isinstance(subdir, self.__class__)
+        assert isinstance(subdir, DirListing)
 
         self._dirs.append(subdir)
 
