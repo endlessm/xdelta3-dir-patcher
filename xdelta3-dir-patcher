@@ -30,18 +30,19 @@ import zipfile
 import multiprocessing
 import concurrent.futures
 
-from stat import *
+from collections import OrderedDict
 from filecmp import dircmp
-from sys import stderr, stdout
+from grp import getgrgid
 from io import StringIO
-from tempfile import mkdtemp
-from subprocess import check_output, STDOUT, CalledProcessError
-from shutil import copymode, copystat, copyfile, copytree, copy2, rmtree
 from os import chmod, chown, cpu_count, geteuid, listdir, lstat, makedirs, mkdir
 from os import O_NOFOLLOW, O_RDONLY, path, readlink, remove, rmdir, symlink, sep
 from os import stat, utime, walk
 from pwd import getpwuid
-from grp import getgrgid
+from shutil import copymode, copystat, copyfile, copytree, copy2, rmtree
+from stat import *
+from subprocess import check_output, STDOUT, CalledProcessError
+from sys import stderr, stdout
+from tempfile import mkdtemp
 
 from os import open as os_open #Prevent mangling the regular open()
 
@@ -472,10 +473,10 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
             items[segment_path] = subdir_obj
 
     def _safe_makedirs(self, target_dir):
-        super()._acquire_lock()
         if not path.exists(target_dir):
+            super()._acquire_lock()
             makedirs(target_dir, exist_ok = True)
-        super()._release_lock()
+            super()._release_lock()
 
     # XXX: Not thread safe when uninitialized
     @property
@@ -534,7 +535,17 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
 
         print('Tar: Gathering completed (%s)' % self.archive_name)
 
-        self._items = items
+        # Create an ordered list rather than a regular dictionary
+        # since tar archives are intended to be read sequentially
+        ordered_items = OrderedDict()
+        ordered_items[None] = items[None]
+        for item in members:
+            ordered_items[item.name] = items.pop(item.name)
+
+        # Add back any items that we manually created (missing hierarchy)
+        ordered_items.update(items)
+
+        self._items = ordered_items
 
         return self._items
 
@@ -587,7 +598,8 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
 
             return
 
-        self._safe_makedirs(extraction_path)
+        if not path.exists(extraction_path):
+            makedirs(extraction_path, exist_ok = True)
 
         # Manually handle symlinks
         if file_obj.is_link:
@@ -815,9 +827,9 @@ class XDelta3DirPatcher(object):
         chown(dest_file, uid,gid, follow_symlinks = False)
 
     def _find_file_delta(self, filename, old_archive_obj, new_archive_obj,
-                          old_root,
-                          new_root,
-                          target_root):
+                         old_root,
+                         new_root,
+                         target_root):
         if self.args.debug:
             print("Processing \'%s\'" % filename)
         else:
@@ -949,6 +961,7 @@ class XDelta3DirPatcher(object):
                     print('Queueing \'%s\'' % filename)
                 else:
                     print('.', end = "")
+                stdout.flush()
 
                 runner.add_task(self._find_file_delta, (filename,
                                                         old_archive_obj,
@@ -1088,6 +1101,7 @@ class XDelta3DirPatcher(object):
                     print('Queueing \'%s\'' % patch)
                 else:
                     print('.', end = "")
+                stdout.flush()
 
                 runner.add_task(self._apply_file_delta, (patch_archive,
                                                          patch,
@@ -1108,10 +1122,6 @@ class XDelta3DirPatcher(object):
             print >> sys.stderr, "ERROR: You must be root to apply the delta!" \
                                  "Exiting.\n"
             raise Exception()
-
-    @staticmethod
-    def get_random_string(length = 8):
-        return ''.join([random.choice('0123456789abcdef') for i in range(length)])
 
     def run(self):
         print("Running directory patcher...")

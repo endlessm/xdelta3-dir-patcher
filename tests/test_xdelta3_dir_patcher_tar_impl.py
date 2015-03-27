@@ -20,6 +20,7 @@ import imp
 import unittest
 import tarfile
 
+from collections import OrderedDict
 from mock import Mock
 from shutil import rmtree, copyfile
 from tempfile import mkdtemp
@@ -68,6 +69,47 @@ class TestXDelta3DirPatcherTarImpl(unittest.TestCase):
         with self.test_class(archive) as test_object:
             TestHelpers.verify_new_version1_members(self, self.patcher,
                                                     test_object.list_items())
+
+    def test_members_listed_in_order_as_in_archive_and_miss_hierachy(self):
+        archive = self.get_archive('missing_hierarchy')
+
+        with self.test_class(archive) as test_object:
+            self.assertTrue(isinstance(test_object.list_items(), OrderedDict))
+
+            # Regular keys are not modifiable and also mutable
+            # so we do some magic here to ensure that's not the case
+            listing = list(test_object.list_items().copy().keys())
+            listing.remove(None)
+
+        with tarfile.open(archive) as archive_object:
+            expected_listing = archive_object.getnames()
+
+        expected_created_hierarchy = ['foo',
+                                      'foo/bar',
+                                      'foo/bar/baz',
+                                      'foo/bar/baz/foo',
+                                      'foo/bar/baz/foo/bar',
+                                      'foo/bar/baz/foo/bar/baz']
+
+        self.assertEqual(listing[0:len(expected_listing)], expected_listing)
+        self.assertEqual(sorted(listing[len(expected_listing):]),
+                         expected_created_hierarchy)
+
+    def test_members_listed_in_order_as_in_archive(self):
+        archive = self.get_archive('new_version1')
+
+        with self.test_class(archive) as test_object:
+            self.assertTrue(isinstance(test_object.list_items(), OrderedDict))
+
+            # Regular keys are not modifiable and also mutable
+            # so we do some magic here to ensure that's not the case
+            listing = list(test_object.list_items().copy().keys())
+            listing.remove(None)
+
+        with tarfile.open(archive) as archive_object:
+            expected_listing = archive_object.getnames()
+
+        self.assertEqual(listing, expected_listing)
 
     def test_list_members_is_cached(self):
         orig_archive = self.get_archive('new_version1')
