@@ -355,7 +355,7 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
         return self._members
 
     def _makedirs_with_check(self, directory):
-        if not path.exists(directory):
+        if not path.lexists(directory):
             makedirs(directory, exist_ok = True)
 
     def expand(self, root, extraction_path):
@@ -484,7 +484,7 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
             items[segment_path] = subdir_obj
 
     def _safe_makedirs(self, target_dir):
-        if not path.exists(target_dir):
+        if not path.lexists(target_dir):
             super()._acquire_lock()
             makedirs(target_dir, exist_ok = True)
             super()._release_lock()
@@ -608,7 +608,7 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
 
             return
 
-        if not path.exists(extraction_path):
+        if not path.lexists(extraction_path):
             makedirs(extraction_path, exist_ok = True)
 
         # Manually handle symlinks
@@ -875,7 +875,7 @@ class XDelta3DirPatcher(object):
             dest_path = path.abspath(target_path)
 
             target_dir = path.dirname(dest_path)
-            if not path.exists(target_dir):
+            if not path.lexists(target_dir):
                 makedirs(target_dir, exist_ok = True)
 
             new_dst = readlink(source_path)
@@ -883,12 +883,12 @@ class XDelta3DirPatcher(object):
             if self.args.debug: print("symlink: ", [source_path, dest_path])
 
         elif path.isdir(new_path):
-            if not path.exists(target_dir):
+            if not path.lexists(target_dir):
                 makedirs(target_dir, exist_ok = True)
 
             self.copy_attributes(new_path, target_dir)
         else:
-            if not path.exists(target_dir):
+            if not path.lexists(target_dir):
                 makedirs(target_dir, exist_ok = True)
 
             # Regular file
@@ -1030,7 +1030,7 @@ class XDelta3DirPatcher(object):
         else:
             print('X', end = "")
 
-        if not path.exists(deleted_item_path):
+        if not path.lexists(deleted_item_path):
             return
 
         if path.isdir(deleted_item_path):
