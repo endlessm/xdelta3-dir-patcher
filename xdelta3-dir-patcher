@@ -355,10 +355,6 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
 
         return self._members
 
-    def _makedirs_with_check(self, directory):
-        if not path.lexists(directory):
-            makedirs(directory, exist_ok = True)
-
     def expand(self, root, extraction_path):
         assert root in self.members, \
                'Unknown member path specified: %s' % root
@@ -374,17 +370,17 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
         dir_path = path.dirname(target_path)
 
         if root_obj.is_link:
-            self._makedirs_with_check(dir_path)
+            makedirs(dir_path, exist_ok = True)
 
             source_path = path.abspath(source_path)
             target_path = path.abspath(target_path)
 
             symlink(root_obj.link_target, target_path)
         elif root_obj.is_file:
-            self._makedirs_with_check(dir_path)
+            makedirs(dir_path, exist_ok = True)
             copy2(source_path, target_path, follow_symlinks = False)
         else:
-            self._makedirs_with_check(target_path)
+            makedirs(target_path, exist_ok = True)
 
             # TODO: Test me
             # Ensure that permissions/ids are transferred along to the target
@@ -485,10 +481,9 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
             items[segment_path] = subdir_obj
 
     def _safe_makedirs(self, target_dir):
-        if not path.lexists(target_dir):
-            super()._acquire_lock()
-            makedirs(target_dir, exist_ok = True)
-            super()._release_lock()
+        super()._acquire_lock()
+        makedirs(target_dir, exist_ok = True)
+        super()._release_lock()
 
     # XXX: Not thread safe when uninitialized
     @property
@@ -1020,9 +1015,10 @@ class XDelta3DirPatcher(object):
 
         print("Done")
 
-    # XXX This implementation requires directories passed in to be
-    #     empty. Callers are required to send in files first if they
-    #     expect a mixture of dirs/files of the same path.
+    # XXX This implementation needs directories passed in to be
+    #     empty for proper cleanup. Callers are required to send
+    #     in files first if they expect a mixture of dirs/files
+    #     on the same paths.
     @staticmethod
     def remove_item(target_dir, deleted_item, debug = False, attempt = 0):
         deleted_item_path = path.join(target_dir, deleted_item)
@@ -1035,21 +1031,13 @@ class XDelta3DirPatcher(object):
             return
 
         if path.isdir(deleted_item_path):
-            # XXX: Try again a couple of seconds if concurrent threads have
-            #      not removed the internal files within the directory yet and
-            #      raise the errors otherwise. The approach is a bit strange but
-            #      it allows us for multi-threaded removal, prevents usage of
-            #      rmtree, and will fail properly if it's a real OSError
             try:
                 rmdir(deleted_item_path)
-            except OSError as ose:
-                if cpu_count() < 2 or attempt > 8:
-                    raise ose
-
-                time.sleep(0.2)
-
-                attempt += 1
-                XDelta3DirPatcher.remove_item(target_dir, deleted_item, debug, attempt)
+            except OSError as e:
+                # We don't care about directories that might get leftover
+                # since they will be empty anyways but we do our best to
+                # clean up
+                pass
         else:
             remove(deleted_item_path)
 

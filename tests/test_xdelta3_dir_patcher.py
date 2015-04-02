@@ -595,7 +595,7 @@ class TestXDelta3DirPatcher(unittest.TestCase):
 
         self.assertFalse(path.exists(deleted_path))
 
-    def test_remove_deleted_items_fails_correctly_on_non_empty_dirs(self):
+    def test_remove_deleted_items_doesnt_break_on_non_empty_dirs(self):
         old_path = path.join(self.TEST_FILE_PREFIX, 'nested_deletion')
         rmtree(self.temp_dir)
         copytree(old_path, self.temp_dir)
@@ -604,16 +604,10 @@ class TestXDelta3DirPatcher(unittest.TestCase):
                                  'updated folder')
 
 
-        try:
-            self.test_class.remove_item(self.temp_dir,
-                                        deleted_path,
-                                        True)
-
-            raise Exception('Did not throw expected exception')
-        except OSError as ose:
-            pass
-        except Exception as e:
-            raise e
+        # Implicit no-exception test
+        self.test_class.remove_item(self.temp_dir,
+                                    deleted_path,
+                                    True)
 
     # ------------------- XDeltaImpl tests
     def test_xdelta_impl_run_command_invokes_the_command(self):
