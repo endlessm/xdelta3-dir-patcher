@@ -1,3 +1,9 @@
+xdelta3-dir-patcher (0.6.1) unstable; urgency=medium
+
+  * Fixed Python 3.2 import issues of cpu_count
+
+ -- Srdjan Grubor <sgnn7@sgnn7.org>  Wed, 08 Apr 2015 10:49:09 -0500
+
 xdelta3-dir-patcher (0.6) unstable; urgency=medium
 
   * Various architecture changes that turn this into a multi-threaded
