@@ -24,7 +24,8 @@ from collections import OrderedDict
 from mock import Mock
 from shutil import rmtree, copyfile
 from tempfile import mkdtemp
-from os import cpu_count, listdir, lstat, path, chmod, makedirs, walk, remove
+from multiprocessing import cpu_count
+from os import listdir, lstat, path, chmod, makedirs, walk, remove
 from stat import S_IRWXU, S_IRWXG, S_IROTH, S_IXOTH, S_IMODE
 
 from .test_helpers import TestHelpers

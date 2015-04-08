@@ -21,7 +21,7 @@ import unittest
 
 from mock import Mock
 from time import sleep
-from os import cpu_count
+from multiprocessing import cpu_count
 
 class TestExecutorRunner(unittest.TestCase):
     # Dashes are standard for exec scipts but not allowed for modules in Python. We

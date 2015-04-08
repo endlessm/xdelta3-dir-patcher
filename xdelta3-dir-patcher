@@ -35,7 +35,8 @@ from collections import OrderedDict
 from filecmp import dircmp
 from grp import getgrgid
 from io import StringIO
-from os import chmod, lchown, cpu_count, geteuid, listdir, lstat, makedirs, mkdir
+from multiprocessing import cpu_count
+from os import chmod, lchown, geteuid, listdir, lstat, makedirs, mkdir
 from os import O_NOFOLLOW, O_RDONLY, path, readlink, remove, rmdir, symlink, sep
 from os import stat, utime, walk
 from pwd import getpwuid
