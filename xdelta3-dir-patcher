@@ -843,7 +843,12 @@ class XDelta3DirPatcher(object):
             chmod(target, file_obj.permissions)
 
         if file_obj.uid and file_obj.gid:
-            lchown(target, file_obj.uid, file_obj.gid)
+            try:
+                lchown(target, file_obj.uid, file_obj.gid)
+            except PermissionError as pe:
+                # We only ignore problems here if ignore_euid flag is set
+                if not self.args.ignore_euid:
+                    raise pe
 
     def _find_file_delta(self, filename, old_archive_obj, new_archive_obj,
                          old_root,
