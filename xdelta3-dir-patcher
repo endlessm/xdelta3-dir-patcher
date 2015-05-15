@@ -139,7 +139,7 @@ class DirListing(object):
         padding = relative_path.count(path.sep)
         is_link = '-> %s' % root.link_target if root.is_link else ''
 
-        print('| ' * padding +  '⇩', relative_path, is_link, file = output)
+        print('| ' * padding +  'v', relative_path, is_link, file = output)
 
         for subdir in root.dirs:
             dir_path = path.join(root_path, root.name)
@@ -149,7 +149,7 @@ class DirListing(object):
             self._print_dir_listing(subdir, output, dir_path)
 
         for filename in root.files:
-            print('| ' * padding + "↳", self._formatted_file_str(filename),
+            print('| ' * padding + "-", self._formatted_file_str(filename),
                   file = output)
 
     def __repr__(self):
