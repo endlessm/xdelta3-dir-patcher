@@ -1,3 +1,11 @@
+xdelta3-dir-patcher (0.6.2) unstable; urgency=medium
+
+  * Fixed bugs related to running the debugging code in non-unicode terminals
+  * Fixed issue of chowning files when we can't do it and --ignore-euid flag
+    is set
+
+ -- Srdjan Grubor <sgnn7@sgnn7.org>  Mon, 18 May 2015 10:05:52 -0500
+
 xdelta3-dir-patcher (0.6.1) unstable; urgency=medium
 
   * Fixed Python 3.2 import issues of cpu_count
