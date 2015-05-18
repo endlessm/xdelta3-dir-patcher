@@ -48,7 +48,7 @@ from tempfile import mkdtemp
 
 from os import open as os_open #Prevent mangling the regular open()
 
-VERSION='0.6.1'
+VERSION='0.6.2'
 
 # Allows for invoking attributes as methods/functions
 class AttributeDict(dict):
