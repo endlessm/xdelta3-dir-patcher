@@ -1,3 +1,10 @@
+xdelta3-dir-patcher (0.6.3) unstable; urgency=medium
+
+  * Fixed issues with trailing separators in directory names in Tar
+    archives
+
+ -- Srdjan Grubor <sgnn7@sgnn7.org>  Fri, 05 Feb 2016 17:58:53 -0600
+
 xdelta3-dir-patcher (0.6.2) unstable; urgency=medium
 
   * Fixed bugs related to running the debugging code in non-unicode terminals
