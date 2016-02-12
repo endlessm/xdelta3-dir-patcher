@@ -1,3 +1,9 @@
+xdelta3-dir-patcher (0.6.4) unstable; urgency=medium
+
+  * Handle os.makedirs EEXIST handling on python < 3.4.1.
+
+ -- Dan Nicholson <nicholson@endlessm.com>  Thu, 11 Feb 2016 17:06:42 -0800
+
 xdelta3-dir-patcher (0.6.3) unstable; urgency=medium
 
   * Fixed issues with trailing separators in directory names in Tar
