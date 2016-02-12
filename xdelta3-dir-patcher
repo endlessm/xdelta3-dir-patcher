@@ -50,7 +50,7 @@ from tempfile import mkdtemp
 from os import open as os_open #Prevent mangling the regular open()
 from os import makedirs as os_makedirs
 
-VERSION='0.6.3'
+VERSION='0.6.4'
 
 if hexversion < 0x30401f0:
     # Handle makedirs throwing EEXIST if the leaf directory mode doesn't
