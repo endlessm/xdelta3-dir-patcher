@@ -34,18 +34,21 @@ import concurrent.futures
 
 from collections import OrderedDict
 from filecmp import dircmp
-from grp import getgrgid
 from io import StringIO
 from multiprocessing import cpu_count
-from os import chmod, lchown, geteuid, listdir, lstat, mkdir
-from os import O_NOFOLLOW, O_RDONLY, path, readlink, remove, rmdir, symlink, sep
+from os import chmod, listdir, lstat, mkdir, name as os_name
+from os import path, readlink, remove, rmdir, symlink, sep
 from os import stat, utime, walk
-from pwd import getpwuid
 from shutil import copymode, copystat, copyfile, copytree, copy2, rmtree
 from stat import *
 from subprocess import check_output, STDOUT, CalledProcessError
 from sys import hexversion, stderr, stdout
 from tempfile import mkdtemp
+
+if os_name != 'nt':
+    from grp import getgrgid
+    from os import geteuid, lchown
+    from pwd import getpwuid
 
 from os import open as os_open #Prevent mangling the regular open()
 from os import makedirs as os_makedirs
@@ -302,11 +305,15 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
             group = getgrgid(gid)[0]
         except KeyError as ke:
             pass
+        except NameError as ne:
+            pass
 
         user = None
         try:
             user = getpwuid(uid)[0],
         except KeyError as ke:
+            pass
+        except NameError as ne:
             pass
 
         setter_func = getattr(dir_listing, method)
@@ -416,6 +423,8 @@ class XDelta3FsImpl(XDelta3AbstractArchiveImpl):
                 #      between archive<->archive to copy these values
 
                 # print('WARNING! Could not change uid/gid of', target_path)
+                pass
+            except NameError as ne:
                 pass
 
     def create(self, base_dir):
@@ -620,6 +629,8 @@ class XDelta3TarImpl(XDelta3AbstractArchiveImpl):
                 try:
                     lchown(folder_path, file_obj.uid, file_obj.gid)
                 except PermissionError as pe:
+                    pass
+                except NameError as ne:
                     pass
 
             return
@@ -851,7 +862,10 @@ class XDelta3DirPatcher(object):
         uid = stat(src_file).st_uid
         gid = stat(src_file).st_gid
 
-        lchown(dest_file, uid, gid)
+        try:
+            lchown(dest_file, uid, gid)
+        except NameError as ne:
+            pass
 
     # TODO: Unit test me
     def copy_attributes_from_archive(self, archive_object, filename, target):
@@ -867,7 +881,9 @@ class XDelta3DirPatcher(object):
             except PermissionError as pe:
                 # We only ignore problems here if ignore_euid flag is set
                 if not self.args.ignore_euid:
-                    raise pe
+                     raise pe
+            except NameError as ne:
+                pass
 
     def _find_file_delta(self, filename, old_archive_obj, new_archive_obj,
                          old_root,
@@ -1159,7 +1175,13 @@ class XDelta3DirPatcher(object):
         print("Done")
 
     @staticmethod
-    def check_euid(ignore_euid, get_euid_method = geteuid):
+    def check_euid(ignore_euid, get_euid_method = None):
+        if not get_euid_method:
+            if os_name != 'nt':
+                get_euid_method = geteuid
+            else:
+                get_euid_method = lambda: None
+
         if (not ignore_euid) and get_euid_method() != 0:
             print >> sys.stderr, "ERROR: You must be root to apply the delta!" \
                                  "Exiting.\n"
