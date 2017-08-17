@@ -29,7 +29,8 @@ optional arguments:
 ```
 
 ### Windows notes
-- Must have `xdelta3.exe` in directory or in path
+- Must have `xdelta3.exe` in directory or in path (you can find a version [here](https://github.com/jmacd/xdelta-gpl/releases) but rename it to `xdelta3.exe`)
+- Must use `--ignore-euid` when applying patchset
 - Barely tested but might work
 - Test suite not ported (currently no plans for it either)
 
