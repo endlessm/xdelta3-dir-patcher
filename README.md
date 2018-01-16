@@ -1,7 +1,9 @@
 xdelta3-dir-patcher
 ===================
 
-This script is a tool for generating and applying recursive XDelta3 diffs from sources in various forms (zip, tgz, folder) since no tool exists to do this efficiently right now. The code was written with portability in mind so its in Python3 and contained in one script (even though it makes developments a bit tricky). While the code has decent tests and robust QA process (for the `*nix` platform), it was developed for a very specific use case and should be treated as beta software but it's open source so feel free to open pull requests for it.
+This script is a tool for generating and applying recursive XDelta3 diffs from sources in various forms (zip, tgz, folder) since no tool exists to do this efficiently right now. The code was written with portability in mind so it is in Python3 and contained in one script (even though it makes developments a bit tricky). While the code has decent tests and robust QA process (for the `*nix` platform), it was developed for a very specific use case and should be treated as beta software but it's open source so feel free to open pull requests for it.
+
+NOTE: This package is at this point in maintenance mode. This doesn't mean that it is broken and/or outdated software but any new features will probably have to be added outside of the original creators/maintainers (@sgnn7, @dbnicholson).
 
 ### Usage
 ```
@@ -52,4 +54,4 @@ python3 -m unittest discover
 nosetests3
 ```
 
-© 2014-2017 Endless Mobile
+© 2014-2018 Endless Mobile
